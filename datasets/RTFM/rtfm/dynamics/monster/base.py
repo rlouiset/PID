@@ -4,7 +4,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import random
+import random_monster
 from collections import defaultdict, deque
 
 from rtfm.dynamics import world_object as O, event as E, item as I, stats as S, inventory as V, encumbrance, dice as D

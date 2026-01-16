@@ -7,5 +7,5 @@
 from .agent import *
 from .base import *
 from .hostile import *
-from .random import *
+from .random_monster import *
 from .stationary import *

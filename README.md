@@ -56,6 +56,10 @@ To install the repository, first clone the repository via Git, and then install 
 conda env create [-n ENVNAME] -f environment.yml
 ```
 ### Experiments
+First, add the path:
+```
+export PYTHONPATH=$(pwd)
+```
 #### Synthetic Data
 The code for synthetic data experiments in the paper *Quantifying & Modeling Multimodal Interactions: An Information Decomposition Framework* is located under `synthetic/`.
 

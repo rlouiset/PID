@@ -24,7 +24,6 @@ parser.add_argument('--num-classes', default=32, type=int)
 parser.add_argument('--out-path', default='MultiBench/synthetic', type=str)
 args = parser.parse_args()
 
-
 def save_data(data, filename):
     with open(os.path.join(args.out_path, filename), 'wb') as f:
         pickle.dump(data, f)
@@ -61,7 +60,7 @@ total_labels = []
 transforms = dict()
 for x in intersections:
     transforms[x] = np.random.uniform(0.0,1.0,(feature_dim_info[x].dim, args.transform_dim))
-label_transform = nn.Sequential(nn.Dropout(0.2))
+label_transform = nn.Sequential(nn.Dropout(0.1))
 
 dataset = []
 for _ in range(num_data):

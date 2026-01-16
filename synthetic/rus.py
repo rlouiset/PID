@@ -6,8 +6,10 @@ from scipy.special import rel_entr
 def solve_Q_new(P: np.ndarray):
   '''
   Compute optimal Q given 3d array P 
-  with dimensions coressponding to x1, x2, and y respectively
+  with dimensions coresponding to x1, x2, and y respectively
   '''
+  print(P.shape)
+
   Py = P.sum(axis=0).sum(axis=0)
   Px1 = P.sum(axis=1).sum(axis=1)
   Px2 = P.sum(axis=0).sum(axis=1)
@@ -53,9 +55,9 @@ def solve_Q_new(P: np.ndarray):
   all_constrs = [sum_to_one_Q] + A_cstrs + B_cstrs + Q_pdt_dist_cstrs
   prob = cp.Problem(cp.Minimize(obj), all_constrs)
   try:
-    prob.solve(verbose=False, max_iters=10000)
+    prob.solve(verbose=False, max_iters=2000, eps=1e-2)
   except:
-    prob.solve(solver=SCS, verbose=False, max_iters=10000)
+    prob.solve(solver=SCS, verbose=False, max_iters=2000, eps=1e-2)
 
   # print(prob.status)
   # print(prob.value)
@@ -159,7 +161,9 @@ def UI(P, cond_id=0):
   return sum
 
 def get_measure(P):
+  print("ah")
   Q = solve_Q_new(P)
+  print("ah1")
   redundancy = CoI(Q)
   print('Redundancy', redundancy)
   unique_1 = UI(Q, cond_id=1)

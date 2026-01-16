@@ -85,8 +85,6 @@ def deal_with_objective(objective, pred, truth, args):
         return objective(pred, truth.to(device), args)
 
 
-
-
 def train(
         encoders, fusion, head, train_dataloader, valid_dataloader, total_epochs, additional_optimizing_modules=[], is_packed=False,
         early_stop=False, task="classification", optimtype=torch.optim.RMSprop, lr=0.001, weight_decay=0.0,
