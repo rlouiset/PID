@@ -1,0 +1,42 @@
+# Ignore log files
+*.log
+
+# Ignore .pt files
+*.pt
+
+# Ignore .pth files
+*.pth
+
+# Ignore .pickle files
+*.pickle
+
+# Ignore .pickle files
+synthetic/experiments/*.pickle
+
+# Ignore temp folders
+temp/
+
+# Datasets
+data/
+fsdd/
+*.wav
+
+# PyTorch
+*.pt
+*.pth
+*.ckpt
+
+# Numpy
+*.npy
+*.npz
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Mac
+.DS_Store
+
+# Conda
+env/
+
+checkpoints/
