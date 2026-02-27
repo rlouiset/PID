@@ -45,7 +45,7 @@ def traditional_cross_entropy_from_probs(probs, targets, eps=1e-12):
     return acc.item(), ce.item()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+print(device)
 
 def config():
     parser = argparse.ArgumentParser(description='Pytorch audiovisual MNIST digit classification')
