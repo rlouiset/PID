@@ -20,6 +20,8 @@ from torchvision.transforms import Compose
 
 TARGET_FRAMES = 64
 
+softmax = torch.nn.Softmax(dim=-1)
+
 def pad_or_crop(spec):
     # spec shape: (n_mels, time)
     n_mels, T = spec.shape
