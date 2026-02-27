@@ -9,8 +9,28 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
-from model import CNN, FCN
+from model import CNN
 from dataset import AV_dataset
+
+import torch
+import torch.nn.functional as F
+from torchaudio.transforms import MelSpectrogram, AmplitudeToDB
+from torchvision.transforms import Compose
+
+TARGET_FRAMES = 64
+
+def pad_or_crop(spec):
+    # spec shape: (n_mels, time)
+    n_mels, T = spec.shape
+
+    if T > TARGET_FRAMES:
+        spec = spec[:, :TARGET_FRAMES]  # crop
+
+    elif T < TARGET_FRAMES:
+        pad = TARGET_FRAMES - T
+        spec = F.pad(spec, (0, pad))  # pad time dimension
+
+    return spec
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -84,21 +104,23 @@ def load_fsdd():
 
     # Specify transformations to be applied to the raw audio
     transforms = Compose([
-        # Trim silence from the start and end of the audio
         TrimSilence(threshold=1e-6),
-        # Generate n_mfcc+1 MFCCs (and remove the first one since it is a constant offset)
-        lambda audio: MFCC(sample_rate=8e3, n_mfcc=n_mfcc + 1)(audio)[1:, :],
-        # Standardize MFCCs for each frame
-        lambda mfcc: (mfcc - mfcc.mean(axis=0)) / mfcc.std(axis=0),
-        # Transpose from DxT to TxD
-        lambda mfcc: mfcc.transpose(1, 0),
-        # Resize into 28x28
-        lambda mfcc: Resize(size=(28, 28))(mfcc.unsqueeze(0)).squeeze(),
+
+        MelSpectrogram(
+            sample_rate=8000,
+            n_mels=64,
+            n_fft=512,
+            hop_length=128
+        ),
+
+        AmplitudeToDB(),
+
+        pad_or_crop
     ])
 
     # Initialize a generator for a local version of FSDD
     fsdd = TorchFSDDGenerator(version='local', path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10', transforms=transforms,
-                              load_all=True)
+                              load_all=True) #  '/Users/robinlouiset/Documents/torch-fsdd/lib/test/data/v1.0.10'
 
     # Create two Torch datasets for a train-test split from the generator
     train_set, test_set = fsdd.train_test_split(test_size=0.1)
@@ -144,8 +166,10 @@ def train(args, model, device, train_loader, optimizer, epoch):
     for batch_idx, (imgs, audios, labels) in enumerate(train_loader):
         imgs, audios, labels = imgs.to(device), audios.to(device), labels.to(device)
         optimizer.zero_grad()
-        output = model(imgs, audios)
+        output, output_img, output_aud = model.forward(imgs, audios, unimodal="train")
         loss = F.cross_entropy(output, labels)
+        loss += F.cross_entropy(output_img, labels)
+        loss += F.cross_entropy(output_aud, labels)
         if batch_idx == 0:
             Ls = loss.item()
         if batch_idx % args.log_interval == 0:
@@ -190,12 +214,7 @@ def mnist(args):
     Ls = np.zeros(args.epoch)
     acc, V_acc, A_acc = np.copy(Ls), np.copy(Ls), np.copy(Ls)
 
-    if args.model == 'FCN':
-        model = FCN(args.depth, args.fuse_depth).to(device)
-    elif args.model == 'CNN':
-        model = CNN(args.depth, args.fuse_depth).to(device)
-    else:
-        raise NotImplementedError
+    model = CNN().to(device)
     print(model)
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
