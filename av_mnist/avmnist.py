@@ -97,7 +97,7 @@ def load_fsdd():
     ])
 
     # Initialize a generator for a local version of FSDD
-    fsdd = TorchFSDDGenerator(version='local', path='/Users/robinlouiset/Documents/torch-fsdd/lib/test/data/v1.0.10', transforms=transforms,
+    fsdd = TorchFSDDGenerator(version='local', path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10', transforms=transforms,
                               load_all=True)
 
     # Create two Torch datasets for a train-test split from the generator
