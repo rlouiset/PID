@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 from model import CNN
-from dataset import AV_dataset
+from dataset import AV_dataset_sum
 from utils_ours import return_redundancy_test_performances, compute_PID_categorical
 
 import torch
@@ -153,8 +153,8 @@ def prepare_dataset(args):
     a_train, a_test = load_fsdd()
 
     # Create a multimodal dataset instance and its DataLoader
-    AV_trainset = AV_dataset(v_train, a_train)
-    AV_testset = AV_dataset(v_test, a_test)
+    AV_trainset = AV_dataset_sum(v_train, a_train)
+    AV_testset = AV_dataset_sum(v_test, a_test)
     AV_train = DataLoader(AV_trainset, **train_kwargs)
     AV_test = DataLoader(AV_testset, **test_kwargs)
 
