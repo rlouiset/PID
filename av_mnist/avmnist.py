@@ -11,6 +11,7 @@ from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 from model import CNN
 from dataset import AV_dataset
+from utils_ours import return_redundancy_test_performances, compute_PID_categorical
 
 import torch
 import torch.nn.functional as F
@@ -31,6 +32,15 @@ def pad_or_crop(spec):
         spec = F.pad(spec, (0, pad))  # pad time dimension
 
     return spec
+
+def traditional_cross_entropy_from_probs(probs, targets, eps=1e-12):
+    probs = torch.clamp(probs, min=eps, max=1.0)
+    log_probs = torch.log(probs)
+
+    ce = -log_probs[torch.arange(targets.shape[0]), targets.long()].mean()
+    acc = (probs.argmax(dim=1) == targets).float().mean()
+
+    return acc.item(), ce.item()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -182,37 +192,83 @@ def train(args, model, device, train_loader, optimizer, epoch):
 
 
 def test_unit(model, device, test_loader, unimodal=None):
+
     model.eval()
-    test_loss = 0
-    correct = 0
+
+    total_acc = 0
+    total_ce = 0
+    total_n = 0
+
     with torch.no_grad():
         for imgs, audios, labels in test_loader:
-            imgs, audios, labels = imgs.to(device), audios.to(device), labels.to(device)
-            output = model(imgs, audios, unimodal)
-            test_loss += F.cross_entropy(output, labels, reduction='sum').item()  # sum up batch loss
-            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-            correct += pred.eq(labels.view_as(pred)).sum().item()
 
-    test_loss /= len(test_loader.dataset)
-    test_acc = correct / len(test_loader.dataset)
+            imgs = imgs.to(device)
+            audios = audios.to(device)
+            labels = labels.to(device)
 
-    print('[{} testset] Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-        unimodal, test_loss, correct, len(test_loader.dataset), 100. * test_acc))
-    return test_acc
+            logits = model(imgs, audios, unimodal)
+
+            probs = torch.exp(logits)
+
+            acc, ce = traditional_cross_entropy_from_probs(probs, labels)
+
+            batch_size = labels.size(0)
+
+            total_acc += acc * batch_size
+            total_ce += ce * batch_size
+            total_n += batch_size
+
+    avg_acc = total_acc / total_n
+    avg_ce = total_ce / total_n
+
+    print(
+        "[{} testset] CE: {:.4f}, Accuracy: {:.4f}".format(
+            unimodal, avg_ce, avg_acc
+        )
+    )
+
+    return avg_acc, avg_ce
 
 
 def test(model, device, test_loader):
-    acc = test_unit(model, device, test_loader)
-    visual_acc = test_unit(model, device, test_loader, 'visual')
-    audio_acc = test_unit(model, device, test_loader, 'audio')
-    return acc, visual_acc, audio_acc
+    acc, ce = test_unit(model, device, test_loader)
+    visual_acc, visual_ce = test_unit(model, device, test_loader, 'visual')
+    audio_acc, audio_ce = test_unit(model, device, test_loader, 'audio')
+    return acc, ce, visual_acc, visual_ce, audio_acc, audio_ce
 
+def extract_representations(model, loader, device):
+
+    model.eval()
+
+    visual_list = []
+    audio_list = []
+    label_list = []
+
+    with torch.no_grad():
+
+        for imgs, audios, labels in loader:
+
+            imgs = imgs.to(device)
+            audios = audios.to(device)
+
+            img_repr, aud_repr = model.get_representations(imgs, audios)
+
+            visual_list.append(img_repr.cpu())
+            audio_list.append(aud_repr.cpu())
+            label_list.append(labels)
+
+    visual_repr = torch.cat(visual_list)
+    audio_repr = torch.cat(audio_list)
+    labels = torch.cat(label_list)
+
+    return visual_repr, audio_repr, labels
 
 def mnist(args):
     AV_train, AV_test = prepare_dataset(args)
 
     Ls = np.zeros(args.epoch)
     acc, V_acc, A_acc = np.copy(Ls), np.copy(Ls), np.copy(Ls)
+    ce, V_ce, A_ce = np.copy(Ls), np.copy(Ls), np.copy(Ls)
 
     model = CNN().to(device)
     print(model)
@@ -220,12 +276,39 @@ def mnist(args):
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     for epoch in range(1, args.epoch + 1):
-        acc[epoch - 1], V_acc[epoch - 1], A_acc[epoch - 1] = test(model, device, AV_test)
+        acc[epoch - 1],  ce[epoch - 1],  V_acc[epoch - 1], V_ce[epoch - 1],  A_acc[epoch - 1], A_ce[epoch - 1] = test(model, device, AV_test)
         Ls[epoch - 1] = train(args, model, device, AV_train, optimizer, epoch)
         scheduler.step()
 
     vis(args, Ls, acc, V_acc, A_acc)
 
+    train_vis, train_aud, y_train = extract_representations(model, AV_train, device)
+    test_vis, test_aud, y_test = extract_representations(model, AV_test, device)
+
+    X_train_dict = {
+        "modality0": train_vis.float(),
+        "modality1": train_aud.float()
+    }
+
+    X_test_dict = {
+        "modality0": test_vis.float(),
+        "modality1": test_aud.float()
+    }
+
+    y_pred_dict = return_redundancy_test_performances(X_train_dict, X_train_dict, X_test_dict, y_train, y_train, y_test,
+                                                      "redundancy", distribution_target="categorical",
+                                                      num_classes=10)
+
+    results = {}
+    for key in ["modality0", "modality1", "average"]:
+        acc_, ce_ = traditional_cross_entropy_from_probs(softmax(y_pred_dict[key]), y_pred_dict["targets"])
+        results[key] = {"accuracy": acc_, "cross_entropy": ce_}
+
+    for k, v in results.items():
+        print("redundancy representations - " + f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")
+
+    compute_PID_categorical(ce[-1], V_ce[-1], A_ce[-1], results["average"]["cross_entropy"],
+                            num_classes=10)
 
 if __name__ == '__main__':
     args = config().parse_args()

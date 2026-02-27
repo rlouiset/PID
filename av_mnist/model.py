@@ -127,3 +127,16 @@ class CNN(nn.Module):
             x = self.audio_classifier(aud)
 
         return F.log_softmax(x, dim=1)
+
+    def get_representations(self, xA, xB):
+        # Image embedding
+        img = self.image_encoder(xA)
+        img = torch.flatten(img, 1)
+        img = self.image_fc(img)
+
+        # Audio embedding
+        aud = self.audio_encoder(xB)
+        aud = torch.flatten(aud, 1)
+        aud = self.audio_fc(aud)
+
+        return img, aud
