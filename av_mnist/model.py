@@ -34,7 +34,7 @@ def corrupt(xA, xB, feed_A=0.8, feed_AB=0.2):
 
 class CNN(nn.Module):
 
-    def __init__(self, emb_dim=128):
+    def __init__(self, num_classes=10, emb_dim=128):
         super(CNN, self).__init__()
 
         # -------- Image branch (MNIST) --------
@@ -81,19 +81,19 @@ class CNN(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(emb_dim * 2, 128),
             nn.ReLU(),
-            nn.Linear(128, 10)
+            nn.Linear(128, num_classes)
         )
 
         self.audio_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
             nn.ReLU(),
-            nn.Linear(128, 10)
+            nn.Linear(128, num_classes)
         )
 
         self.visual_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
             nn.ReLU(),
-            nn.Linear(128, 10)
+            nn.Linear(128, num_classes)
         )
 
     def forward(self, xA, xB, unimodal=None):

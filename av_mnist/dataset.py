@@ -46,3 +46,32 @@ class AV_dataset(Dataset):
 
     def __getitem__(self, idx):
         return self.paired_samples[idx]
+
+class AV_dataset_sum(Dataset):
+
+    def __init__(self, mnist_dataset, audio_dataset):
+        self.mnist_dataset = mnist_dataset
+        self.audio_dataset = audio_dataset
+
+    def __len__(self):
+        # length defined by the smallest dataset
+        return min(len(self.mnist_dataset), len(self.audio_dataset))
+
+    def __getitem__(self, idx):
+
+        # sample image
+        img, img_label = self.mnist_dataset[idx]
+
+        # sample random audio digit
+        audio_idx = random.randint(0, len(self.audio_dataset) - 1)
+        audio, audio_label = self.audio_dataset[audio_idx]
+
+        audio = torch.unsqueeze(audio, 0)
+
+        # binary target based on digit sum
+        digit_sum = img_label + audio_label
+
+        target = 1 if digit_sum > 5 else 0
+        target = torch.tensor(target, dtype=torch.long)
+
+        return img, audio, target
