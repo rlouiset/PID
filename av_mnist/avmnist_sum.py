@@ -51,8 +51,8 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=40, metavar='N', help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
+    parser.add_argument('--epoch', type=int, default=50, metavar='N', help='number of epochs to train')
+    parser.add_argument('--lr', type=float, default=0.004, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
     parser.add_argument('--log-interval', type=int, default=30, metavar='N',
@@ -184,7 +184,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         print("fusion acc:", (output.argmax(1) == labels).float().mean())
         print('---')
 
-        if epoch > 20:
+        if epoch > 25:
             loss += 4*F.nll_loss(output[labels==0], labels[labels==0]) + F.nll_loss(output[labels==1], labels[labels==1])
             # loss += F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
             # loss += F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
@@ -281,7 +281,7 @@ def mnist(args):
     model = CNN_sum(num_classes=2).to(device)
     print(model)
 
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     for epoch in range(1, args.epoch + 1):
         acc[epoch - 1],  ce[epoch - 1],  V_acc[epoch - 1], V_ce[epoch - 1],  A_acc[epoch - 1], A_ce[epoch - 1] = test(model, device, AV_test)
         Ls[epoch - 1] = train(args, model, device, AV_train, optimizer, epoch)
