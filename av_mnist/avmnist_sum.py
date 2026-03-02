@@ -172,13 +172,13 @@ def prepare_dataset(args):
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
-    for batch_idx, (imgs, audios, labels) in enumerate(train_loader):
+    for batch_idx, (imgs, audios, labels, _, _) in enumerate(train_loader):
         imgs, audios, labels = imgs.to(device), audios.to(device), labels.to(device)
         optimizer.zero_grad()
         output, output_img, output_aud = model.forward(imgs, audios, unimodal="train")
-        loss = F.cross_entropy(output, labels)
-        loss += F.cross_entropy(output_img, labels)
-        loss += F.cross_entropy(output_aud, labels)
+        loss = 4 * F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
+        loss += 4 * F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
+        loss += 4 * F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
         if batch_idx == 0:
             Ls = loss.item()
         if batch_idx % args.log_interval == 0:
@@ -199,7 +199,7 @@ def test_unit(model, device, test_loader, unimodal=None):
     total_n = 0
 
     with torch.no_grad():
-        for imgs, audios, labels in test_loader:
+        for imgs, audios, labels, _ ,_ in test_loader:
 
             imgs = imgs.to(device)
             audios = audios.to(device)
@@ -245,7 +245,7 @@ def extract_representations(model, loader, device):
 
     with torch.no_grad():
 
-        for imgs, audios, labels in loader:
+        for imgs, audios, labels, _, _ in loader:
 
             imgs = imgs.to(device)
             audios = audios.to(device)

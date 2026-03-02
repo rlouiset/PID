@@ -74,4 +74,4 @@ class AV_dataset_sum(Dataset):
         target = 1 if digit_sum > 5 else 0
         target = torch.tensor(target, dtype=torch.long)
 
-        return img, audio, target
+        return img, audio, target, img_label, audio_label
