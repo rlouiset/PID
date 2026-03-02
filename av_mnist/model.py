@@ -190,11 +190,11 @@ class CNN_sum(nn.Module):
 
         # -------- Fusion classifier --------
         self.classifier = nn.Sequential(
-            nn.Linear(emb_dim * 2, 128),
+            nn.Linear(emb_dim * 2, 1024),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(1024, 1024),
             nn.ReLU(),
-            nn.Linear(128, 2)
+            nn.Linear(1024, 2)
         )
 
         self.audio_classifier = nn.Sequential(
