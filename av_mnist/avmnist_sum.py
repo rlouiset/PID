@@ -53,7 +53,7 @@ def config():
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
     parser.add_argument('--epoch', type=int, default=30, metavar='N', help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.04, metavar='LR', help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
     parser.add_argument('--log-interval', type=int, default=30, metavar='N',
@@ -272,7 +272,7 @@ def mnist(args):
     model = CNN(num_classes=2).to(device)
     print(model)
 
-    optimizer = optim.SGD(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     for epoch in range(1, args.epoch + 1):
         acc[epoch - 1],  ce[epoch - 1],  V_acc[epoch - 1], V_ce[epoch - 1],  A_acc[epoch - 1], A_ce[epoch - 1] = test(model, device, AV_test)
