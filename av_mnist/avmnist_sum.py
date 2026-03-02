@@ -180,7 +180,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss += F.cross_entropy(output_digit_aud, labels_aud)
 
         if epoch > 3:
-            loss += 2*F.binary_cross_entropy(output[labels==0, 0], labels[labels==0]) + F.binary_cross_entropy(output[labels==1, 0], labels[labels==1])
+            loss += 2*F.binary_cross_entropy(output[labels==0, 0].float(), labels[labels==0].float()) + F.binary_cross_entropy(output[labels==1, 0].float(), labels[labels==1].float())
             # loss += 2*F.binary_cross_entropy(output_img[labels == 0, 0], labels[labels == 0]) + F.binary_cross_entropy(output_img[labels == 1, 0], labels[labels == 1])
             # loss += 2*F.binary_cross_entropy(output_aud[labels==0, 0], labels[labels==0]) + F.binary_cross_entropy(output_aud[labels==1, 0], labels[labels==1])
         if batch_idx == 0:
@@ -274,7 +274,7 @@ def mnist(args):
     model = CNN_sum(num_classes=2).to(device)
     print(model)
 
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr)
     for epoch in range(1, args.epoch + 1):
         acc[epoch - 1],  ce[epoch - 1],  V_acc[epoch - 1], V_ce[epoch - 1],  A_acc[epoch - 1], A_ce[epoch - 1] = test(model, device, AV_test)
         Ls[epoch - 1] = train(args, model, device, AV_train, optimizer, epoch)
