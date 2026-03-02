@@ -178,11 +178,11 @@ def train(args, model, device, train_loader, optimizer, epoch):
         # loss += F.cross_entropy(output_aud, labels)
         loss = F.cross_entropy(output_digit_img, labels_img)
         loss += F.cross_entropy(output_digit_aud, labels_aud)
-        print(labels[:5])
+
         if epoch > 5:
-            loss = F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
-            loss += F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
-            loss += F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
+            loss += F.binary_cross_entropy(output[labels==0], labels[labels==0]) + F.binary_cross_entropy(output[labels==1], labels[labels==1])
+            loss += F.binary_cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.binary_cross_entropy(output_img[labels == 1], labels[labels == 1])
+            loss += F.binary_cross_entropy(output_aud[labels==0], labels[labels==0]) + F.binary_cross_entropy(output_aud[labels==1], labels[labels==1])
         if batch_idx == 0:
             Ls = loss.item()
         if batch_idx % args.log_interval == 0:
@@ -209,11 +209,9 @@ def test_unit(model, device, test_loader, unimodal=None):
             audios = audios.to(device)
             labels = labels.to(device)
 
-            logits = model(imgs, audios, unimodal)
+            probs = model(imgs, audios, unimodal)
 
-            probs = torch.exp(F.log_softmax(logits, dim=1))
-
-            acc, ce = traditional_cross_entropy_from_probs(probs, labels)
+            acc, ce = traditional_cross_entropy_from_probs(torch.cat((1-probs, probs), dim=1), labels)
 
             batch_size = labels.size(0)
 
