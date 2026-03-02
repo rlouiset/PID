@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from unimodals.common_models import MLP3
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -190,7 +192,7 @@ class CNN_sum(nn.Module):
         self.audio_fc = nn.Linear(128 * 4 * 4, emb_dim)
 
         # -------- Fusion classifier --------
-        self.classifier = nn.MLP3(emb_dim * 2, 128, 2)
+        self.classifier = MLP3(emb_dim * 2, 128, 2)
 
         self.audio_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
