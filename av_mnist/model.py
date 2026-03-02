@@ -132,7 +132,8 @@ class CNN(nn.Module):
             img = self.visual_classifier(img)
             aud = self.audio_classifier(aud)
 
-            return F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1), F.log_softmax(img_digit, dim=1), F.log_softmax(aud_digit, dim=1)
+            return (F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1),
+                    F.log_softmax(img_digit, dim=1), F.log_softmax(aud_digit, dim=1))
 
         if unimodal is None:
             # Fusion

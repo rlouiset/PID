@@ -50,10 +50,10 @@ print(device)
 def config():
     parser = argparse.ArgumentParser(description='Pytorch audiovisual MNIST digit classification')
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
-    parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
-    parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
+    parser.add_argument('--batch-size', type=int, default=4096, metavar='N', help='input batch size for training')
+    parser.add_argument('--test-batch-size', type=int, default=4096, metavar='N', help='input batch size for testing')
     parser.add_argument('--epoch', type=int, default=30, metavar='N', help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.04, metavar='LR', help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.004, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
     parser.add_argument('--log-interval', type=int, default=30, metavar='N',
