@@ -179,9 +179,9 @@ def train(args, model, device, train_loader, optimizer, epoch):
         imgs, audios, labels = imgs.to(device), audios.to(device), labels.to(device)
         optimizer.zero_grad()
         output, output_img, output_aud = model.forward(imgs, audios, unimodal="train")
-        loss = F.cross_entropy(output, labels)
-        loss += F.cross_entropy(output_img, labels)
-        loss += F.cross_entropy(output_aud, labels)
+        loss = F.nll_loss(output, labels)
+        loss += F.nll_loss(output_img, labels)
+        loss += F.nll_loss(output_aud, labels)
         if batch_idx == 0:
             Ls = loss.item()
         if batch_idx % args.log_interval == 0:
