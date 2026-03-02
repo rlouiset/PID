@@ -176,16 +176,13 @@ def train(args, model, device, train_loader, optimizer, epoch):
         # loss = F.cross_entropy(output, labels)
         # loss += F.cross_entropy(output_img, labels)
         # loss += F.cross_entropy(output_aud, labels)
-        loss = traditional_cross_entropy_from_probs(torch.exp(output_digit_img), labels_img)
-        loss += traditional_cross_entropy_from_probs(torch.exp(output_digit_aud), labels_aud)
+        loss = F.cross_entropy(output_digit_img, labels_img)
+        loss += F.cross_entropy(output_digit_aud, labels_aud)
         print(labels[:5])
         if epoch > 5:
-            output = torch.exp(output)
-            output_img = torch.exp(output_img)
-            output_aud = torch.exp(output_aud)
-            loss = traditional_cross_entropy_from_probs(output[labels==0], labels[labels==0]) + traditional_cross_entropy_from_probs(output[labels==1], labels[labels==1])
-            loss += traditional_cross_entropy_from_probs(output_img[labels == 0], labels[labels == 0]) + traditional_cross_entropy_from_probs(output_img[labels == 1], labels[labels == 1])
-            loss += traditional_cross_entropy_from_probs(output_aud[labels==0], labels[labels==0]) + traditional_cross_entropy_from_probs(output_aud[labels==1], labels[labels==1])
+            loss = F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
+            loss += F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
+            loss += F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
         if batch_idx == 0:
             Ls = loss.item()
         if batch_idx % args.log_interval == 0:
@@ -214,7 +211,7 @@ def test_unit(model, device, test_loader, unimodal=None):
 
             logits = model(imgs, audios, unimodal)
 
-            probs = torch.exp(logits)
+            probs = torch.exp(F.log_softmax(logits, dim=1))
 
             acc, ce = traditional_cross_entropy_from_probs(probs, labels)
 
