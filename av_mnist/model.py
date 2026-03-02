@@ -192,10 +192,6 @@ class CNN_sum(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(emb_dim * 2, 1024),
             nn.ReLU(),
-            nn.Dropout(p=0.1),
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
-            nn.Dropout(p=0.1),
             nn.Linear(1024, 1)
         )
 

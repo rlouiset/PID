@@ -179,8 +179,8 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss = F.cross_entropy(output_digit_img, labels_img)
         loss += F.cross_entropy(output_digit_aud, labels_aud)
 
-        if epoch > 3:
-            loss += 2*F.binary_cross_entropy(output[labels==0, 0].float(), labels[labels==0].float()) + F.binary_cross_entropy(output[labels==1, 0].float(), labels[labels==1].float())
+        if epoch > 5:
+            loss = 2*F.binary_cross_entropy(output[labels==0, 0].float(), labels[labels==0].float()) + F.binary_cross_entropy(output[labels==1, 0].float(), labels[labels==1].float())
             # loss += 2*F.binary_cross_entropy(output_img[labels == 0, 0], labels[labels == 0]) + F.binary_cross_entropy(output_img[labels == 1, 0], labels[labels == 1])
             # loss += 2*F.binary_cross_entropy(output_aud[labels==0, 0], labels[labels==0]) + F.binary_cross_entropy(output_aud[labels==1, 0], labels[labels==1])
         if batch_idx == 0:
@@ -210,6 +210,10 @@ def test_unit(model, device, test_loader, unimodal=None):
             labels = labels.to(device)
 
             probs = model(imgs, audios, unimodal)
+
+            if unimodal is None:
+                print(labels[:10])
+                print(probs[:10])
 
             acc, ce = traditional_cross_entropy_from_probs(torch.cat((1-probs, probs), dim=1), labels)
 
