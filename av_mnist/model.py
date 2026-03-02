@@ -240,8 +240,8 @@ class CNN_sum(nn.Module):
             img_digit = self.visual_digit_classifier(img)
             aud_digit = self.audio_digit_classifier(aud)
 
-            img = self.sigmoid(self.visual_classifier(img))
-            aud = self.sigmoid(self.audio_classifier(aud))
+            img = self.visual_classifier(img)
+            aud = self.audio_classifier(aud)
 
             return F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1), F.log_softmax(img_digit, dim=1), F.log_softmax(aud_digit, dim=1)
 
