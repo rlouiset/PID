@@ -180,7 +180,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss = F.cross_entropy(torch.exp(output_digit_img), labels_img)
         loss += F.cross_entropy(torch.exp(output_digit_aud), labels_aud)
         print(labels[:5])
-        if epoch > 10:
+        if epoch > 5:
             output = torch.exp(output)
             output_img = torch.exp(output_img)
             output_aud = torch.exp(output_aud)
@@ -280,7 +280,7 @@ def mnist(args):
     model = CNN_sum(num_classes=2).to(device)
     print(model)
 
-    optimizer = optim.SGD(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     for epoch in range(1, args.epoch + 1):
         acc[epoch - 1],  ce[epoch - 1],  V_acc[epoch - 1], V_ce[epoch - 1],  A_acc[epoch - 1], A_ce[epoch - 1] = test(model, device, AV_test)
