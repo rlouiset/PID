@@ -174,6 +174,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
     for batch_idx, (imgs, audios, labels, labels_img, labels_aud) in enumerate(train_loader):
         imgs, audios, labels = imgs.to(device), audios.to(device), labels.to(device)
+        labels_img, labels_aud = labels_img.to(device), labels_aud.to(device)
         optimizer.zero_grad()
         output, output_img, output_aud, output_digit_img, output_digit_aud = model.forward(imgs, audios, unimodal="train")
         loss = 4 * F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
