@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
-from model import CNN
+from model import CNN_sum
 from dataset import AV_dataset_sum
 from utils_ours import return_redundancy_test_performances, compute_PID_categorical
 
@@ -66,10 +66,7 @@ def config():
 
 
 def vis(args, Ls, acc, V_acc, A_acc):
-    if args.model == 'FCN':
-        L = args.depth
-    elif args.model == 'CNN':
-        L = args.depth + 1
+    L = args.depth + 1
     filename = "{}_L{}_Lf{}_lr{}_seed{}".format(args.model, L, args.fuse_depth, args.lr, args.seed)
 
     import pandas as pd
@@ -182,10 +179,11 @@ def train(args, model, device, train_loader, optimizer, epoch):
         # loss += F.cross_entropy(output_aud, labels)
         loss = F.cross_entropy(output_digit_img, labels_img)
         loss += F.cross_entropy(output_digit_aud, labels_aud)
+        print(labels[:5])
         if epoch > 5:
-            loss += 4 * F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
-            loss += 4 * F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
-            loss += 4 * F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
+            loss = F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
+            loss += F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
+            loss += F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
         if batch_idx == 0:
             Ls = loss.item()
         if batch_idx % args.log_interval == 0:
@@ -276,7 +274,7 @@ def mnist(args):
     acc, V_acc, A_acc = np.copy(Ls), np.copy(Ls), np.copy(Ls)
     ce, V_ce, A_ce = np.copy(Ls), np.copy(Ls), np.copy(Ls)
 
-    model = CNN(num_classes=2).to(device)
+    model = CNN_sum(num_classes=2).to(device)
     print(model)
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr)

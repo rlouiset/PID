@@ -98,6 +98,117 @@ class CNN(nn.Module):
             nn.Linear(128, num_classes)
         )
 
+    def forward(self, xA, xB, unimodal=None):
+
+        # Image embedding
+        img = self.image_encoder(xA)
+        img = torch.flatten(img, 1)
+        img = self.image_fc(img)
+
+        # Audio embedding
+        aud = self.audio_encoder(xB)
+        aud = torch.flatten(aud, 1)
+        aud = self.audio_fc(aud)
+
+        if unimodal=="train":
+            x = torch.cat((img, aud), dim=1)
+            x = self.classifier(x)
+
+            img = self.visual_classifier(img)
+            aud = self.audio_classifier(aud)
+
+            return F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1)
+
+        if unimodal is None:
+            # Fusion
+            x = torch.cat((img, aud), dim=1)
+            x = self.classifier(x)
+        elif unimodal == "visual":
+            x = self.visual_classifier(img)
+        else:
+            x = self.audio_classifier(aud)
+
+        return F.log_softmax(x, dim=1)
+
+    def get_representations(self, xA, xB):
+        # Image embedding
+        img = self.image_encoder(xA)
+        img = torch.flatten(img, 1)
+        img = self.image_fc(img)
+
+        # Audio embedding
+        aud = self.audio_encoder(xB)
+        aud = torch.flatten(aud, 1)
+        aud = self.audio_fc(aud)
+
+        return img, aud
+
+class CNN_sum(nn.Module):
+
+    def __init__(self, num_classes=10, emb_dim=128):
+        super(CNN_sum, self).__init__()
+
+        # -------- Image branch (MNIST) --------
+        self.image_encoder = nn.Sequential(
+            nn.Conv2d(1, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(32, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(64, 128, 3, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((4,4))
+        )
+
+        self.image_fc = nn.Linear(128 * 4 * 4, emb_dim)
+
+        # -------- Audio branch (spectrogram) --------
+        self.audio_encoder = nn.Sequential(
+            nn.Conv2d(1, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(32, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(64, 128, 3, padding=1),
+            nn.ReLU(),
+
+            nn.Conv2d(128, 128, 3, padding=1),
+            nn.ReLU(),
+
+            nn.Conv2d(128, 128, 3, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((4,4))
+        )
+
+        self.audio_fc = nn.Linear(128 * 4 * 4, emb_dim)
+
+        # -------- Fusion classifier --------
+        self.classifier = nn.Sequential(
+            nn.Linear(emb_dim * 2, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes)
+        )
+
+        self.audio_classifier = nn.Sequential(
+            nn.Linear(emb_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes)
+        )
+
+        self.visual_classifier = nn.Sequential(
+            nn.Linear(emb_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_classes)
+        )
+
         self.audio_digit_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
             nn.ReLU(),
