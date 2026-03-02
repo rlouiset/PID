@@ -183,13 +183,14 @@ class CNN_sum(nn.Module):
 
             nn.Conv2d(128, 128, 3, padding=1),
             nn.ReLU(),
+
             nn.AdaptiveAvgPool2d((4,4))
         )
 
         self.audio_fc = nn.Linear(128 * 4 * 4, emb_dim)
 
         # -------- Fusion classifier --------
-        self.classifier = nn.MLP3(emb_dim * 2, 1024, 2)
+        self.classifier = nn.MLP3(emb_dim * 2, 128, 2)
 
         self.audio_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),

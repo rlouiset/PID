@@ -52,7 +52,7 @@ def config():
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
     parser.add_argument('--epoch', type=int, default=30, metavar='N', help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.4, metavar='LR', help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
     parser.add_argument('--log-interval', type=int, default=30, metavar='N',
@@ -176,11 +176,16 @@ def train(args, model, device, train_loader, optimizer, epoch):
         # loss = F.cross_entropy(output, labels)
         # loss += F.cross_entropy(output_img, labels)
         # loss += F.cross_entropy(output_aud, labels)
-        loss = F.cross_entropy(output_digit_img, labels_img)
-        loss += F.cross_entropy(output_digit_aud, labels_aud)
-        print(labels[:5])
+        loss = F.nll_loss(output_digit_img, labels_img)
+        loss += F.nll_loss(output_digit_aud, labels_aud)
+
+        print("img digit acc:", (output_digit_img.argmax(1) == labels_img).float().mean())
+        print("aud digit acc:", (output_digit_aud.argmax(1) == labels_aud).float().mean())
+        print("fusion acc:", (output.argmax(1) == labels).float().mean())
+        print('---')
+
         if epoch > 15:
-            loss = 3*F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
+            loss = F.nll_loss(output, labels) # + F.nll_loss(output[labels==1], labels[labels==1])
             # loss += F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
             # loss += F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
         if batch_idx == 0:
@@ -276,7 +281,7 @@ def mnist(args):
     model = CNN_sum(num_classes=2).to(device)
     print(model)
 
-    optimizer = optim.SGD(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.parameters())
     for epoch in range(1, args.epoch + 1):
         acc[epoch - 1],  ce[epoch - 1],  V_acc[epoch - 1], V_ce[epoch - 1],  A_acc[epoch - 1], A_ce[epoch - 1] = test(model, device, AV_test)
         Ls[epoch - 1] = train(args, model, device, AV_train, optimizer, epoch)
