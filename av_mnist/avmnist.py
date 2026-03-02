@@ -276,11 +276,9 @@ def mnist(args):
     print(model)
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
-    scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     for epoch in range(1, args.epoch + 1):
         acc[epoch - 1],  ce[epoch - 1],  V_acc[epoch - 1], V_ce[epoch - 1],  A_acc[epoch - 1], A_ce[epoch - 1] = test(model, device, AV_test)
         Ls[epoch - 1] = train(args, model, device, AV_train, optimizer, epoch)
-        scheduler.step()
 
     vis(args, Ls, acc, V_acc, A_acc)
 
