@@ -179,10 +179,10 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss = F.cross_entropy(output_digit_img, labels_img)
         loss += F.cross_entropy(output_digit_aud, labels_aud)
 
-        if epoch > 5:
-            loss += F.binary_cross_entropy(output[labels==0], labels[labels==0]) + F.binary_cross_entropy(output[labels==1], labels[labels==1])
-            loss += F.binary_cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.binary_cross_entropy(output_img[labels == 1], labels[labels == 1])
-            loss += F.binary_cross_entropy(output_aud[labels==0], labels[labels==0]) + F.binary_cross_entropy(output_aud[labels==1], labels[labels==1])
+        if epoch > 3:
+            loss += 2*F.binary_cross_entropy(output[labels==0, 0], labels[labels==0]) + F.binary_cross_entropy(output[labels==1, 0], labels[labels==1])
+            # loss += 2*F.binary_cross_entropy(output_img[labels == 0, 0], labels[labels == 0]) + F.binary_cross_entropy(output_img[labels == 1, 0], labels[labels == 1])
+            # loss += 2*F.binary_cross_entropy(output_aud[labels==0, 0], labels[labels==0]) + F.binary_cross_entropy(output_aud[labels==1, 0], labels[labels==1])
         if batch_idx == 0:
             Ls = loss.item()
         if batch_idx % args.log_interval == 0:
