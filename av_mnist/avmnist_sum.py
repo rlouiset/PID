@@ -177,10 +177,13 @@ def train(args, model, device, train_loader, optimizer, epoch):
         # loss = F.cross_entropy(output, labels)
         # loss += F.cross_entropy(output_img, labels)
         # loss += F.cross_entropy(output_aud, labels)
-        loss = F.cross_entropy(output_digit_img, labels_img)
-        loss += F.cross_entropy(output_digit_aud, labels_aud)
+        loss = F.cross_entropy(torch.exp(output_digit_img), labels_img)
+        loss += F.cross_entropy(torch.exp(output_digit_aud), labels_aud)
         print(labels[:5])
-        if epoch > 5:
+        if epoch > 10:
+            output = torch.exp(output)
+            output_img = torch.exp(output_img)
+            output_aud = torch.exp(output_aud)
             loss = F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
             loss += F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
             loss += F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
