@@ -190,21 +190,23 @@ class CNN_sum(nn.Module):
 
         # -------- Fusion classifier --------
         self.classifier = nn.Sequential(
-            nn.Linear(emb_dim * 2, 1024),
+            nn.Linear(emb_dim * 2, 128),
             nn.ReLU(),
-            nn.Linear(1024, 1)
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 2)
         )
 
         self.audio_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
             nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(128, 2)
         )
 
         self.visual_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
             nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(128, 2)
         )
 
         self.audio_digit_classifier = nn.Sequential(
@@ -218,8 +220,6 @@ class CNN_sum(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 10)
         )
-
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, xA, xB, unimodal=None):
 
@@ -243,7 +243,7 @@ class CNN_sum(nn.Module):
             img = self.sigmoid(self.visual_classifier(img))
             aud = self.sigmoid(self.audio_classifier(aud))
 
-            return self.sigmoid(x), img, aud, F.log_softmax(img_digit, dim=1), F.log_softmax(aud_digit, dim=1)
+            return F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1), F.log_softmax(img_digit, dim=1), F.log_softmax(aud_digit, dim=1)
 
         if unimodal is None:
             # Fusion
@@ -254,7 +254,7 @@ class CNN_sum(nn.Module):
         else:
             x = self.audio_classifier(aud)
 
-        return self.sigmoid(x)
+        return F.log_softmax(x, dim=1)
 
     def get_representations(self, xA, xB):
         # Image embedding
