@@ -172,11 +172,13 @@ def prepare_dataset(args):
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
-    for batch_idx, (imgs, audios, labels, _, _) in enumerate(train_loader):
+    for batch_idx, (imgs, audios, labels, labels_img, labels_aud) in enumerate(train_loader):
         imgs, audios, labels = imgs.to(device), audios.to(device), labels.to(device)
         optimizer.zero_grad()
-        output, output_img, output_aud = model.forward(imgs, audios, unimodal="train")
+        output, output_img, output_aud, output_digit_img, output_digit_aud = model.forward(imgs, audios, unimodal="train")
         loss = 4 * F.cross_entropy(output[labels==0], labels[labels==0]) + F.cross_entropy(output[labels==1], labels[labels==1])
+        loss += F.cross_entropy(output_digit_img, labels_img)
+        loss += F.cross_entropy(output_digit_aud, labels_aud)
         loss += 4 * F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
         loss += 4 * F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
         if batch_idx == 0:

@@ -98,6 +98,18 @@ class CNN(nn.Module):
             nn.Linear(128, num_classes)
         )
 
+        self.audio_digit_classifier = nn.Sequential(
+            nn.Linear(emb_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 10)
+        )
+
+        self.visual_digit_classifier = nn.Sequential(
+            nn.Linear(emb_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 10)
+        )
+
     def forward(self, xA, xB, unimodal=None):
 
         # Image embedding
@@ -114,10 +126,13 @@ class CNN(nn.Module):
             x = torch.cat((img, aud), dim=1)
             x = self.classifier(x)
 
+            img_digit = self.visual_digit_classifier(img)
+            aud_digit = self.audio_digit_classifier(aud)
+
             img = self.visual_classifier(img)
             aud = self.audio_classifier(aud)
 
-            return F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1)
+            return F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1), F.log_softmax(img_digit, dim=1), F.log_softmax(aud_digit, dim=1)
 
         if unimodal is None:
             # Fusion
