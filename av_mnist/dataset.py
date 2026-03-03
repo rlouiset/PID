@@ -71,7 +71,7 @@ class AV_dataset_sum(Dataset):
         # binary target based on digit sum
         digit_sum = img_label + audio_label
 
-        target = 1 if digit_sum > 6 else 0
+        target = 1 if digit_sum > 7 else 0
         target = torch.tensor(target, dtype=torch.long)
 
         return img, audio, target, img_label, audio_label
