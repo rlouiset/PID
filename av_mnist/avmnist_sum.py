@@ -340,12 +340,12 @@ def mnist(args):
 
         y_i = y_i.long()
 
-        total_contribution = log(args.num_classes) + torch.log(j_i)[y_i]
+        total_contribution = log(2) + torch.log(j_i)[y_i]
 
-        r_contribution = log(args.num_classes) + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
+        r_contribution = log(2) + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
 
-        m0_contribution = log(args.num_classes) + torch.log(m0_i)[y_i] - r_contribution
-        m1_contribution = log(args.num_classes) + torch.log(m1_i)[y_i] - r_contribution
+        m0_contribution = log(2) + torch.log(m0_i)[y_i] - r_contribution
+        m1_contribution = log(2) + torch.log(m1_i)[y_i] - r_contribution
 
         s_contribution = total_contribution - m0_contribution - m1_contribution - r_contribution
 
