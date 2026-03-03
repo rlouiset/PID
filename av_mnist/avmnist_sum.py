@@ -52,7 +52,7 @@ def config():
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
     parser.add_argument('--epoch', type=int, default=50, metavar='N', help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.004, metavar='LR', help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
     parser.add_argument('--log-interval', type=int, default=30, metavar='N',
@@ -185,7 +185,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         print('---')
 
         if epoch > 25:
-            loss += 4*F.nll_loss(output[labels==0], labels[labels==0]) + F.nll_loss(output[labels==1], labels[labels==1])
+            loss += F.nll_loss(output, labels)
             # loss += F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
             # loss += F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
         if batch_idx == 0:

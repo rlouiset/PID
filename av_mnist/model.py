@@ -192,7 +192,7 @@ class CNN_sum(nn.Module):
         self.audio_fc = nn.Linear(128 * 4 * 4, emb_dim)
 
         # -------- Fusion classifier --------
-        self.classifier = MLP3(emb_dim * 2, 1024, 2)
+        self.classifier = MLP3(emb_dim * 2, 512, 2)
 
         self.audio_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
@@ -207,15 +207,11 @@ class CNN_sum(nn.Module):
         )
 
         self.audio_digit_classifier = nn.Sequential(
-            nn.Linear(emb_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, 10)
+            nn.Linear(emb_dim, 10)
         )
 
         self.visual_digit_classifier = nn.Sequential(
-            nn.Linear(emb_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, 10)
+            nn.Linear(emb_dim, 10)
         )
 
     def forward(self, xA, xB, unimodal=None):
