@@ -356,12 +356,15 @@ def mnist(args):
     unicity_0_combinations = []
     unicity_1_combinations = []
     for img_label, aud_label, pointwise_pids in zip(img_labels, audio_labels, list_of_pointwise_pid):
-        if img_label > 5 and aud_label > 5:
-            redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
-        if img_label < 6 and aud_label > 5:
-            unicity_1_combinations.append(torch.tensor(pointwise_pids)[None, :])
-        if img_label > 5 and aud_label < 6:
-            unicity_0_combinations.append(torch.tensor(pointwise_pids)[None, :])
+        if img_label + aud_label > 5:
+            if img_label > 5 and aud_label > 5:
+                redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+            elif img_label < 6 and aud_label > 5:
+                unicity_1_combinations.append(torch.tensor(pointwise_pids)[None, :])
+            elif img_label > 5 and aud_label < 6:
+                unicity_0_combinations.append(torch.tensor(pointwise_pids)[None, :])
+            else:
+                synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
         else:
             synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
 
