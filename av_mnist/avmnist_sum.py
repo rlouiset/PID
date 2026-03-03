@@ -17,6 +17,8 @@ import torch.nn.functional as F
 from torchaudio.transforms import MelSpectrogram, AmplitudeToDB
 from torchvision.transforms import Compose
 
+from math import *
+
 TARGET_FRAMES = 64
 
 softmax = torch.nn.Softmax(dim=-1)
