@@ -51,7 +51,7 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=50, metavar='N', help='number of epochs to train')
+    parser.add_argument('--epoch', type=int, default=2, metavar='N', help='number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
@@ -275,8 +275,8 @@ def extract_representations(model, loader, device):
     audio_repr = torch.cat(audio_list)
     labels = torch.cat(label_list)
 
-    img_labels = torch.cat(img_labels)
-    audio_labels = torch.cat(audio_labels)
+    img_labels = torch.cat(visual_label_list)
+    audio_labels = torch.cat(audio_label_list)
 
     return visual_repr, audio_repr, labels, img_labels, audio_labels
 
