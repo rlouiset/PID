@@ -139,7 +139,8 @@ def prepare_dataset(args):
     test_kwargs = {'batch_size': args.test_batch_size}
     cuda_kwargs = {'num_workers': 0,
                    'pin_memory': True,
-                   'shuffle': True}
+                   'shuffle': False,
+                   'drop_last': False}
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
     transform = transforms.Compose([
@@ -302,9 +303,11 @@ def mnist(args):
     train_vis, train_aud, y_train, img_labels, audio_labels = extract_representations(model, AV_train, device)
     test_vis, test_aud, y_test, img_labels, audio_labels = extract_representations(model, AV_test, device)
 
-    joint_pred = torch.exp(model.classifier(torch.cat((test_vis, test_aud), dim=1).cuda())).cpu()
-    img_pred = torch.exp(model.visual_classifier(test_vis.cuda())).cpu()
-    aud_pred = torch.exp(model.audio_classifier(test_aud.cuda())).cpu()
+    model.eval()
+    with torch.no_grad():
+        joint_pred = torch.exp(model.classifier(torch.cat((test_vis, test_aud), dim=1).cuda())).cpu()
+        img_pred = torch.exp(model.visual_classifier(test_vis.cuda())).cpu()
+        aud_pred = torch.exp(model.audio_classifier(test_aud.cuda())).cpu()
 
     X_train_dict = {
         "modality0": train_vis.float(),
@@ -338,14 +341,20 @@ def mnist(args):
     list_of_pointwise_pid = []
     for j_i, m0_i, m1_i, r_i, y_i in zip(joint_pred, img_pred, aud_pred, y_pred_dict["average"], y_pred_dict["targets"]):
 
+        print(r_i)
+        print(m0_i)
+        print(m1_i)
+        print(j_i)
+        print(debug)
+
         y_i = y_i.long()
 
-        total_contribution = 0.686 + torch.log(j_i)[y_i]
+        total_contribution = 0.593 + torch.log(torch.clamp(j_i, min=1e-12, max=1.0))[y_i]
 
-        r_contribution = 0.686 + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
+        r_contribution = 0.593 + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
 
-        m0_contribution = 0.686 + torch.log(m0_i)[y_i] - r_contribution
-        m1_contribution = 0.686 + torch.log(m1_i)[y_i] - r_contribution
+        m0_contribution = 0.593 + torch.log(torch.clamp(m0_i, min=1e-12, max=1.0))[y_i] - r_contribution
+        m1_contribution = 0.593 + torch.log(torch.clamp(m1_i, min=1e-12, max=1.0))[y_i] - r_contribution
 
         s_contribution = total_contribution - m0_contribution - m1_contribution - r_contribution
 
@@ -356,19 +365,17 @@ def mnist(args):
     unicity_0_combinations = []
     unicity_1_combinations = []
     for img_label, aud_label, pointwise_pids in zip(img_labels, audio_labels, list_of_pointwise_pid):
-        if img_label + aud_label > 8:
-            if img_label > 8 and aud_label > 8:
+        if img_label + aud_label > 6:
+            if img_label > 6 and aud_label > 6:
                 redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
-            elif img_label < 9 and aud_label > 8:
+            elif img_label < 7 and aud_label > 6:
                 unicity_1_combinations.append(torch.tensor(pointwise_pids)[None, :])
-            elif img_label > 8 and aud_label < 9:
+            elif img_label > 6 and aud_label < 7:
                 unicity_0_combinations.append(torch.tensor(pointwise_pids)[None, :])
             else:
                 synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
         else:
             synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
-
-    print(synergy_combinations[0].shape)
 
     print(torch.cat(synergy_combinations).shape)
 
