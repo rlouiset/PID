@@ -365,6 +365,10 @@ def mnist(args):
         else:
             synergy_combinations.append(torch.tensor(pointwise_pids))
 
+    print(synergy_combinations[0].shape)
+
+    print(torch.cat(synergy_combinations).shape)
+
     print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
     print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
     print("Unicity 0 Combinations:", torch.mean(torch.cat(unicity_0_combinations), dim=0))
