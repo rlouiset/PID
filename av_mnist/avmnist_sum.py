@@ -365,10 +365,10 @@ def mnist(args):
         else:
             synergy_combinations.append(pointwise_pids)
 
-    print("Synergy Combinations:", torch.mean(torch.stack(synergy_combinations), dim=0))
-    print("Redundancy Combinations:", torch.mean(torch.stack(redundancy_combinations), dim=0))
-    print("Unicity 0 Combinations:", torch.mean(torch.stack(unicity_0_combinations), dim=0))
-    print("Unicity 1 Combinations:", torch.mean(torch.stack(unicity_1_combinations), dim=0))
+    print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
+    print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
+    print("Unicity 0 Combinations:", torch.mean(torch.cat(unicity_0_combinations), dim=0))
+    print("Unicity 1 Combinations:", torch.mean(torch.cat(unicity_1_combinations), dim=0))
 
 if __name__ == '__main__':
     args = config().parse_args()
