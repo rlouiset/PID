@@ -351,8 +351,6 @@ def mnist(args):
 
         list_of_pointwise_pid.append([m0_contribution, m1_contribution, r_contribution, s_contribution])
 
-    list_of_pointwise_pid = np.array(list_of_pointwise_pid.detach().cpu())
-
     synergy_combinations = []
     redundancy_combinations = []
     unicity_0_combinations = []
