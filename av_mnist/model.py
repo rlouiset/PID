@@ -116,8 +116,8 @@ class CNN(nn.Module):
             x = torch.cat((img, aud), dim=1)
             x = self.classifier(x)
 
-            img = self.visual_classifier(img)
-            aud = self.audio_classifier(aud)
+            img = self.visual_classifier(img.detach())
+            aud = self.audio_classifier(aud.detach())
 
             return F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1)
 

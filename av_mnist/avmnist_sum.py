@@ -252,9 +252,12 @@ def extract_representations(model, loader, device):
     audio_list = []
     label_list = []
 
+    visual_label_list = []
+    audio_label_list = []
+
     with torch.no_grad():
 
-        for imgs, audios, labels, _, _ in loader:
+        for imgs, audios, labels, img_labels, audio_labels in loader:
 
             imgs = imgs.to(device)
             audios = audios.to(device)
@@ -265,11 +268,17 @@ def extract_representations(model, loader, device):
             audio_list.append(aud_repr.cpu())
             label_list.append(labels)
 
+            visual_label_list.append(img_labels)
+            audio_label_list.append(audio_labels)
+
     visual_repr = torch.cat(visual_list)
     audio_repr = torch.cat(audio_list)
     labels = torch.cat(label_list)
 
-    return visual_repr, audio_repr, labels
+    img_labels = torch.cat(img_labels)
+    audio_labels = torch.cat(audio_labels)
+
+    return visual_repr, audio_repr, labels, img_labels, audio_labels
 
 def mnist(args):
     AV_train, AV_test = prepare_dataset(args)
@@ -288,8 +297,12 @@ def mnist(args):
 
     vis(args, Ls, acc, V_acc, A_acc)
 
-    train_vis, train_aud, y_train = extract_representations(model, AV_train, device)
-    test_vis, test_aud, y_test = extract_representations(model, AV_test, device)
+    train_vis, train_aud, y_train, img_labels, audio_labels = extract_representations(model, AV_train, device)
+    test_vis, test_aud, y_test, img_labels, audio_labels = extract_representations(model, AV_test, device)
+
+    joint_pred = torch.exp(model.classifier(torch.cat((test_vis, test_aud), dim=1)))
+    img_pred = torch.exp(model.visual_classifier(test_vis))
+    aud_pred = torch.exp(model.audio_classifier(test_aud))
 
     X_train_dict = {
         "modality0": train_vis.float(),
@@ -316,8 +329,46 @@ def mnist(args):
     for k, v in results.items():
         print("redundancy representations - " + f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")
 
-    compute_PID_categorical(ce[-1], V_ce[-1], A_ce[-1], results["average"]["cross_entropy"],
-                            num_classes=2)
+    # Compute PID categorical
+    compute_PID_categorical(ce[-1], V_ce[-1], A_ce[-1], results["average"]["cross_entropy"], num_classes=2)
+
+    # Compute PointWise PID
+    list_of_pointwise_pid = []
+    for j_i, m0_i, m1_i, r_i, y_i in zip(joint_pred, img_pred, aud_pred, y_pred_dict["average"], y_pred_dict["targets"]):
+
+        y_i = y_i.long()
+
+        total_contribution = log(args.num_classes) + torch.log(j_i)[y_i]
+
+        r_contribution = log(args.num_classes) + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
+
+        m0_contribution = log(args.num_classes) + torch.log(m0_i)[y_i] - r_contribution
+        m1_contribution = log(args.num_classes) + torch.log(m1_i)[y_i] - r_contribution
+
+        s_contribution = total_contribution - m0_contribution - m1_contribution - r_contribution
+
+        list_of_pointwise_pid.append([m0_contribution, m1_contribution, r_contribution, s_contribution])
+
+    list_of_pointwise_pid = np.array(list_of_pointwise_pid)
+
+    synergy_combinations = []
+    redundancy_combinations = []
+    unicity_0_combinations = []
+    unicity_1_combinations = []
+    for img_label, aud_label, pointwise_pids in zip(img_labels, aud_labels, list_of_pointwise_pid):
+        if img_label > 5 and aud_label > 5:
+            redundancy_combinations.append(pointwise_pids)
+        if img_label < 6 and aud_label > 5:
+            unicity_1_combinations.append(pointwise_pids)
+        if img_label > 5 and aud_label < 6:
+            unicity_0_combinations.append(pointwise_pids)
+        else:
+            synergy_combinations.append(pointwise_pids)
+
+    print("Synergy Combinations:", torch.mean(torch.stack(synergy_combinations), dim=0))
+    print("Redundancy Combinations:", torch.mean(torch.stack(redundancy_combinations), dim=0))
+    print("Unicity 0 Combinations:", torch.mean(torch.stack(unicity_0_combinations), dim=0))
+    print("Unicity 1 Combinations:", torch.mean(torch.stack(unicity_1_combinations), dim=0))
 
 if __name__ == '__main__':
     args = config().parse_args()
