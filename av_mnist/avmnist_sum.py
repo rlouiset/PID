@@ -186,8 +186,8 @@ def train(args, model, device, train_loader, optimizer, epoch):
 
         if epoch > 25:
             loss += F.nll_loss(output, labels)
-            # loss += F.cross_entropy(output_img[labels == 0], labels[labels == 0]) + F.cross_entropy(output_img[labels == 1], labels[labels == 1])
-            # loss += F.cross_entropy(output_aud[labels==0], labels[labels==0]) + F.cross_entropy(output_aud[labels==1], labels[labels==1])
+            loss += F.nll_loss(output_img, labels)
+            loss += F.nll_loss(output_aud, labels)
         if batch_idx == 0:
             Ls = loss.item()
         if batch_idx % args.log_interval == 0:
@@ -304,6 +304,9 @@ def mnist(args):
     y_pred_dict = return_redundancy_test_performances(X_train_dict, X_train_dict, X_test_dict, y_train, y_train, y_test,
                                                       "redundancy", distribution_target="categorical",
                                                       num_classes=2)
+
+    print("Joint ce" + str(ce[-1]) + " - " + "Vision ce" + str(V_ce[-1]) + "Audio ce" + str(A_ce[-1]))
+    print("Joint acc" + str(acc[-1]) + " - " + "Vision acc" + str(V_acc[-1]) + "Audio acc" + str(A_acc[-1]))
 
     results = {}
     for key in ["modality0", "modality1", "average"]:
