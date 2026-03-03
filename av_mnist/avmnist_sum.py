@@ -340,12 +340,12 @@ def mnist(args):
 
         y_i = y_i.long()
 
-        total_contribution = log(2) + torch.log(j_i)[y_i]
+        total_contribution = 0.686 + torch.log(j_i)[y_i]
 
-        r_contribution = log(2) + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
+        r_contribution = 0.686 + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
 
-        m0_contribution = log(2) + torch.log(m0_i)[y_i] - r_contribution
-        m1_contribution = log(2) + torch.log(m1_i)[y_i] - r_contribution
+        m0_contribution = 0.686 + torch.log(m0_i)[y_i] - r_contribution
+        m1_contribution = 0.686 + torch.log(m1_i)[y_i] - r_contribution
 
         s_contribution = total_contribution - m0_contribution - m1_contribution - r_contribution
 
@@ -356,12 +356,12 @@ def mnist(args):
     unicity_0_combinations = []
     unicity_1_combinations = []
     for img_label, aud_label, pointwise_pids in zip(img_labels, audio_labels, list_of_pointwise_pid):
-        if img_label + aud_label > 7:
-            if img_label > 7 and aud_label > 7:
+        if img_label + aud_label > 8:
+            if img_label > 8 and aud_label > 8:
                 redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
-            elif img_label < 8 and aud_label > 7:
+            elif img_label < 9 and aud_label > 8:
                 unicity_1_combinations.append(torch.tensor(pointwise_pids)[None, :])
-            elif img_label > 7 and aud_label < 8:
+            elif img_label > 8 and aud_label < 9:
                 unicity_0_combinations.append(torch.tensor(pointwise_pids)[None, :])
             else:
                 synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
