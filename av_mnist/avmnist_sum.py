@@ -300,9 +300,9 @@ def mnist(args):
     train_vis, train_aud, y_train, img_labels, audio_labels = extract_representations(model, AV_train, device)
     test_vis, test_aud, y_test, img_labels, audio_labels = extract_representations(model, AV_test, device)
 
-    joint_pred = torch.exp(model.classifier(torch.cat((test_vis, test_aud), dim=1)))
-    img_pred = torch.exp(model.visual_classifier(test_vis))
-    aud_pred = torch.exp(model.audio_classifier(test_aud))
+    joint_pred = torch.exp(model.classifier(torch.cat((test_vis, test_aud), dim=1).cuda())).cpu()
+    img_pred = torch.exp(model.visual_classifier(test_vis.cuda())).cpu()
+    aud_pred = torch.exp(model.audio_classifier(test_aud.cuda())).cpu()
 
     X_train_dict = {
         "modality0": train_vis.float(),
