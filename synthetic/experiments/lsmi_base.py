@@ -251,8 +251,8 @@ lsmi_data = {
     "val_targets": y_val,
 }
 
-torch.save(lsmi_data, "lsmi.pt")
-print(f"[✓] Saved LSMI data to {"lsmi.pt"}")
+torch.save(lsmi_data, lsmi.pt)
+print(f"[✓] Saved LSMI data to {args.out_pt}")
 
 # -------------------------
 # Fake cfg replacement
@@ -277,7 +277,7 @@ setup_seed(args.seed)
 # -------------------------
 # Load data
 # -------------------------
-train_loader, val_loader = get_loader(cfg, "lsmi.pt")
+train_loader, val_loader = get_loader(cfg, args.out_pt)
 
 # -------------------------
 # Train estimators

@@ -401,6 +401,9 @@ def mnist(args):
         pid_l2 = pid_norm / np.linalg.norm(pid_norm, axis=1, keepdims=True)
         pid_labels_l2 = pid_labels / np.linalg.norm(pid_labels, axis=1, keepdims=True)
 
+        print(pid_labels_l2.shape)
+        print(pid_l2.shape)
+
         sim_pointwise = np.sum(pid_l2 * pid_labels_l2, axis=1)
 
         print("Mean true per-sample cosine similarity:", sim_pointwise.mean())

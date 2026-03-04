@@ -526,8 +526,8 @@ def mnist(args):
         "val_targets": y_test,
     }
 
-    torch.save(lsmi_data, args.out_pt)
-    print(f"[✓] Saved LSMI data to {args.out_pt}")
+    torch.save(lsmi_data, "lsmi.pt")
+    print(f"[✓] Saved LSMI data to lsmi.pt")
 
     # -------------------------
     # Fake cfg replacement
@@ -552,7 +552,7 @@ def mnist(args):
     # -------------------------
     # Load data
     # -------------------------
-    train_loader, val_loader = get_loader(cfg, args.out_pt)
+    train_loader, val_loader = get_loader(cfg, "lsmi.pt")
 
     # -------------------------
     # Train estimators
