@@ -66,12 +66,15 @@ def test_unit(model, device, loader, unimodal=None):
 
     return avg_acc, avg_ce
 
-class ORDataset(Dataset):
+class XORDataset(Dataset):
+
     def __init__(self, n_samples=10000):
+
         self.x1 = torch.randint(0, 2, (n_samples, 1)).float()
         self.x2 = torch.randint(0, 2, (n_samples, 1)).float()
 
-        self.y = ((self.x1 + self.x2) > 0).long().squeeze()
+        # XOR logic
+        self.y = ((self.x1 + self.x2) % 2).long().squeeze()
 
     def __len__(self):
         return len(self.y)
@@ -180,8 +183,8 @@ def extract_representations(model, loader, device):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-train_set = ORDataset(20000)
-test_set = ORDataset(5000)
+train_set = XORDataset(20000)
+test_set = XORDataset(5000)
 
 train_loader = DataLoader(train_set, batch_size=512, shuffle=True)
 test_loader = DataLoader(test_set, batch_size=512)
