@@ -213,7 +213,7 @@ y_pred_dict = return_redundancy_test_performances(
     y_test,
     "redundancy",
     distribution_target="categorical",
-    num_classes=2
+    lambda_reg=50, num_classes=2, h_dim=1024
 )
 
 # ----- evaluate joint and unimodal performances -----

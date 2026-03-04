@@ -195,6 +195,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
         self,
         model,
         distribution_target: str = "gaussian",
+        lambda_reg=10,
         lr: float = 1e-4,
     ):
         super().__init__()
@@ -205,6 +206,8 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
 
         self.distribution_target = distribution_target
         self.lr = lr
+
+        self.lambda_reg = lambda_reg
 
         self.test_preds = []
         self.test_targets = []
@@ -231,7 +234,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
             pred_loss = F.cross_entropy(y_pred, y) + F.cross_entropy(y_pred_0, y) + F.cross_entropy(y_pred_1, y)
             pred_align_loss = F.mse_loss(y_pred_0.squeeze(), y_pred_1.squeeze())
             sup_clip_loss = supervised_kernel_alignment(z0, z1, y) # supclip_categorical(z0, z1, y, ids)
-            align_loss = 10*(z0 - z1).norm(p=2, dim=1).pow(2).mean()
+            align_loss = self.lambda_reg*(z0 - z1).norm(p=2, dim=1).pow(2).mean()
         else:
             raise NotImplementedError
 
@@ -308,7 +311,7 @@ def return_redundancy_test_performances(
     y_train, y_val, y_test,
     config_name,
     ids_train=None, ids_val=None, ids_test=None,
-    distribution_target="gaussian", num_classes=1
+    distribution_target="gaussian", lambda_reg=10, num_classes=1, h_dim=1024
 ):
 
     if ids_train is None:
@@ -325,11 +328,12 @@ def return_redundancy_test_performances(
     datamodule = MultimodalRepresentationsDataModule(train_ds, val_ds, test_ds)
 
     indim_1, indim_2 = X_train_dict["modality0"].shape[1], X_train_dict["modality1"].shape[1]
-    model = RedundancyRepresentationModel(indim_1, indim_2, num_classes=num_classes)
+    model = RedundancyRepresentationModel(indim_1, indim_2, num_classes=num_classes, hdim=h_dim)
 
     pl_model = RedundancyRepresentationLightningModel(
         model,
         distribution_target=distribution_target,
+        lambda_reg=lambda_reg
     )
 
     checkpoint_dir = f"checkpoints/{config_name}/redundancy"

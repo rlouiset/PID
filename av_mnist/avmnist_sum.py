@@ -342,12 +342,12 @@ def mnist(args):
     for j_i, m0_i, m1_i, r_i, y_i in zip(joint_pred, img_pred, aud_pred, y_pred_dict["average"], y_pred_dict["targets"]):
         y_i = y_i.long()
 
-        total_contribution = 0.593 + torch.log(torch.clamp(softmax(j_i), min=1e-12, max=1.0))[y_i]
+        total_contribution = 0.653 + torch.log(torch.clamp(softmax(j_i), min=1e-12, max=1.0))[y_i]
 
-        r_contribution = 0.593 + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
+        r_contribution = 0.653 + torch.log(torch.clamp(softmax(r_i), min=1e-12, max=1.0))[y_i]
 
-        m0_contribution = 0.593 + torch.log(torch.clamp(softmax(m0_i), min=1e-12, max=1.0))[y_i] - r_contribution
-        m1_contribution = 0.593 + torch.log(torch.clamp(softmax(m1_i), min=1e-12, max=1.0))[y_i] - r_contribution
+        m0_contribution = 0.653 + torch.log(torch.clamp(softmax(m0_i), min=1e-12, max=1.0))[y_i] - r_contribution
+        m1_contribution = 0.653 + torch.log(torch.clamp(softmax(m1_i), min=1e-12, max=1.0))[y_i] - r_contribution
 
         s_contribution = total_contribution - m0_contribution - m1_contribution - r_contribution
 
@@ -359,12 +359,12 @@ def mnist(args):
     unicity_0_combinations = []
     unicity_1_combinations = []
     for img_label, aud_label, pointwise_pids in zip(img_labels, audio_labels, list_of_pointwise_pid):
-        if img_label + aud_label > 6:
-            if img_label > 6 and aud_label > 6:
+        if img_label + aud_label > 7:
+            if img_label > 7 and aud_label > 7:
                 redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
-            elif img_label < 7 and aud_label > 6:
+            elif img_label < 8 and aud_label > 7:
                 unicity_1_combinations.append(torch.tensor(pointwise_pids)[None, :])
-            elif img_label > 6 and aud_label < 7:
+            elif img_label > 7 and aud_label < 8:
                 unicity_0_combinations.append(torch.tensor(pointwise_pids)[None, :])
             else:
                 synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
