@@ -404,7 +404,7 @@ def mnist(args):
         print(pid_labels_l2.shape)
         print(pid_l2.shape)
 
-        sim_pointwise = np.sum(pid_l2 * pid_labels_l2, axis=1)
+        sim_pointwise = torch.sum(pid_l2 * pid_labels_l2, dim=1)
 
         print("Mean true per-sample cosine similarity:", sim_pointwise.mean())
 

@@ -536,13 +536,13 @@ def mnist(args):
         pass
 
     cfg = CFG()
-    cfg.device = torch.device(args.device)
-    cfg.batch_size = args.batch_size
-    cfg.num_workers = args.num_workers
-    cfg.embed_size = args.embed_size
-    cfg.n_classes = args.num_classes
-    cfg.num_epochs_discriminator = args.epochs_disc
-    cfg.num_epochs_entropy_estimator = args.epochs_entropy
+    cfg.device = "cuda"
+    cfg.batch_size = 512
+    cfg.num_workers = 0
+    cfg.embed_size = 128
+    cfg.n_classes = 2
+    cfg.num_epochs_discriminator = 30
+    cfg.num_epochs_entropy_estimator = 30
 
     cfg.input_size_1 = train_vis.shape[1]
     cfg.input_size_2 = train_aud.shape[1]
@@ -633,7 +633,7 @@ def mnist(args):
         print(pid_l2.shape)
         print(pid_labels_l2.shape)
 
-        sim_pointwise = np.sum(pid_l2 * pid_labels_l2, axis=1)
+        sim_pointwise = torch.sum(pid_l2 * pid_labels_l2, dim=1)
 
         print("Mean true per-sample cosine similarity:", sim_pointwise.mean())
 
