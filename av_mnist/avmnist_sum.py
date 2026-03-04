@@ -130,7 +130,7 @@ def load_fsdd():
                               load_all=True) #  '/Users/robinlouiset/Documents/torch-fsdd/lib/test/data/v1.0.10'
 
     # Create two Torch datasets for a train-test split from the generator
-    train_set, test_set = fsdd.train_test_split(test_size=0.1)
+    train_set, test_set = fsdd.train_test_split(test_size=0.2)
     return train_set, test_set
 
 
