@@ -577,7 +577,8 @@ def mnist(args):
 
     # RUS adjustement
     r, u1, u2, s = RUS_adjustment([torch.tensor(r), torch.tensor(u1), torch.tensor(u2), torch.tensor(s)])
-    r, u1, u2, s = r.numpy(), u1.numpy(), u2.numpy(), s.numpy()
+    r, u1, u2, s = (r.detach().cpu().numpy(), u1.detach().cpu().numpy(),
+                    u2.detach().cpu().numpy(), s.detach().cpu().numpy())
 
     print("after adjustement")
     print("r: ", np.mean(r))
