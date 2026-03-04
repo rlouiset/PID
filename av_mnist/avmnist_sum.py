@@ -386,7 +386,30 @@ def mnist(args):
                              torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_of_pointwise_pids[2]), dim=0),
                              torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_of_pointwise_pids[3]), dim=0)]
 
-    pid_names = ["R", "U0", "U1", "S"]
+    pid = torch.cat(list_of_pointwise_pids, dim=0)
+    pid_labels = torch.cat(list_pointwise_labels, dim=0)
+
+    pid = np.maximum(pid, 0)
+    row_sums = pid.sum(axis=1, keepdims=True)
+
+    # Replace zero rows with uniform distribution
+    zero_rows = row_sums.squeeze() == 0
+    pid[zero_rows] = 1.0 / pid.shape[1]
+    # Now renormalize safely
+    pid_norm = pid / pid.sum(axis=1, keepdims=True)
+
+    # L2 normalize both vectors
+    pid_l2 = pid_norm / np.linalg.norm(pid_norm, axis=1, keepdims=True)
+    pid_labels_l2 = pid_labels / np.linalg.norm(pid_labels, axis=1, keepdims=True)
+
+    print(pid_l2.shape)
+    print(pid_labels_l2.shape)
+
+    sim_pointwise = torch.sum(pid_l2 * pid_labels_l2, dim=1)
+
+    print("Mean true per-sample cosine similarity:", sim_pointwise.mean())
+
+    """pid_names = ["R", "U0", "U1", "S"]
     for pid, pid_labels, pid_name in zip(list_of_pointwise_pids, list_pointwise_labels, pid_names):
         pid = np.maximum(pid, 0)
         row_sums = pid.sum(axis=1, keepdims=True)
@@ -401,12 +424,14 @@ def mnist(args):
         pid_l2 = pid_norm / np.linalg.norm(pid_norm, axis=1, keepdims=True)
         pid_labels_l2 = pid_labels / np.linalg.norm(pid_labels, axis=1, keepdims=True)
 
-        print(pid_labels_l2.shape)
         print(pid_l2.shape)
+        print(pid_labels_l2.shape)
 
         sim_pointwise = torch.sum(pid_l2 * pid_labels_l2, dim=1)
 
-        print("Mean true per-sample cosine similarity:", sim_pointwise.mean())
+        print("Mean true per-sample cosine similarity:", sim_pointwise.mean())"""
+
+
 
 if __name__ == '__main__':
     args = config().parse_args()
