@@ -53,7 +53,7 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=2, metavar='N', help='number of epochs to train')
+    parser.add_argument('--epoch', type=int, default=75, metavar='N', help='number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
@@ -323,8 +323,8 @@ def mnist(args):
                                                       "redundancy", distribution_target="categorical",
                                                       num_classes=2)
 
-    print("Joint ce" + str(ce[-1]) + " - " + "Vision ce" + str(V_ce[-1]) + "Audio ce" + str(A_ce[-1]))
-    print("Joint acc" + str(acc[-1]) + " - " + "Vision acc" + str(V_acc[-1]) + "Audio acc" + str(A_acc[-1]))
+    print("Joint ce: " + str(ce[-1]) + " - " + "Vision ce: " + str(V_ce[-1]) + "Audio ce: " + str(A_ce[-1]))
+    print("Joint acc: " + str(acc[-1]) + " - " + "Vision acc: " + str(V_acc[-1]) + "Audio acc: " + str(A_acc[-1]))
 
     results = {}
     for key in ["modality0", "modality1", "average"]:

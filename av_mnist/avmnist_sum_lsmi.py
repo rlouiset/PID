@@ -264,7 +264,7 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=2, metavar='N', help='number of epochs to train')
+    parser.add_argument('--epoch', type=int, default=75, metavar='N', help='number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
@@ -570,7 +570,10 @@ def mnist(args):
     r, u1, u2, s = LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
 
     # stack PID atoms in the same order as weights
-    list_of_pointwise_pid = np.stack([u1, u2, r, s], axis=1)  # shape (N, 4)
+    list_of_pointwise_pid = np.stack([u1.detach().cpu().numpy(),
+                                      u2.detach().cpu().numpy(),
+                                      r.detach().cpu().numpy(),
+                                      s.detach().cpu().numpy()], axis=1)  # shape (N, 4)
 
     # RUS adjustement
     r, u1, u2, s = RUS_adjustment([torch.tensor(r), torch.tensor(u1), torch.tensor(u2), torch.tensor(s)])
