@@ -610,10 +610,10 @@ def mnist(args):
     # POINTWISE COSINE SIMILARITY
     list_of_pointwise_pids = [torch.cat(redundancy_combinations), torch.cat(unicity_0_combinations),
                               torch.cat(unicity_1_combinations), torch.cat(synergy_combinations)]
-    list_pointwise_labels = [torch.cat([torch.tensor([0, 0, 1, 0])[None, :]]*len(list_of_pointwise_pids), dim=0),
-                             torch.cat([torch.tensor([1, 0, 0, 0])[None, :]] * len(list_of_pointwise_pids), dim=0),
-                             torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_of_pointwise_pids), dim=0),
-                             torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_of_pointwise_pids), dim=0)]
+    list_pointwise_labels = [torch.cat([torch.tensor([0, 0, 1, 0])[None, :]]*len(list_of_pointwise_pids[0]), dim=0),
+                             torch.cat([torch.tensor([1, 0, 0, 0])[None, :]] * len(list_of_pointwise_pids[1]), dim=0),
+                             torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_of_pointwise_pids[2]), dim=0),
+                             torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_of_pointwise_pids[3]), dim=0)]
 
     pid_names = ["R", "U0", "U1", "S"]
     for pid, pid_labels, pid_name in zip(list_of_pointwise_pids, list_pointwise_labels, pid_names):
