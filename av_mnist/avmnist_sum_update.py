@@ -110,7 +110,7 @@ def load_fsdd():
     return train_set, test_set
 
 
-def prepare_dataset(args):
+def prepare_dataset(args, cutoff_sum):
     train_kwargs = {'batch_size': args.batch_size}
     test_kwargs = {'batch_size': args.test_batch_size}
     cuda_kwargs = {'num_workers': 0,
@@ -128,8 +128,8 @@ def prepare_dataset(args):
     a_train, a_test = load_fsdd()
 
     # Create a multimodal dataset instance and its DataLoader
-    AV_trainset = AV_dataset_sum(v_train, a_train)
-    AV_testset = AV_dataset_sum(v_test, a_test)
+    AV_trainset = AV_dataset_sum(v_train, a_train, cutoff_sum)
+    AV_testset = AV_dataset_sum(v_test, a_test, cutoff_sum)
     AV_train = DataLoader(AV_trainset, **train_kwargs)
     AV_test = DataLoader(AV_testset, **test_kwargs)
 
@@ -529,6 +529,31 @@ def compute_log_py(targets, num_classes):
 def logp(p):
     return torch.log(torch.clamp(p, 1e-12, 1.0))
 
+def normalize_pid(pid):
+    """
+    Ensure valid PID:
+        - non-negative
+        - sums to 1
+    """
+    pid = np.maximum(pid, 0)
+
+    row_sums = pid.sum(axis=1, keepdims=True)
+    zero_rows = row_sums.squeeze() == 0
+
+    pid[zero_rows] = 1.0 / pid.shape[1]
+    pid /= pid.sum(axis=1, keepdims=True)
+
+    return pid
+
+
+def cosine_similarity(a, b):
+    """
+    Row-wise cosine similarity
+    """
+    a = a / np.linalg.norm(a, axis=1, keepdims=True)
+    b = b / np.linalg.norm(b, axis=1, keepdims=True)
+    return np.sum(a * b, axis=1)
+
 def compute_entropy_from_targets(targets, num_classes):
     import torch
 
@@ -577,7 +602,8 @@ def extract_representations(model, loader, device):
     return visual_repr, audio_repr, labels, img_labels, audio_labels
 
 def mnist(args):
-    AV_train, AV_test = prepare_dataset(args)
+    cutoff_sum = 7
+    AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     model = CNN_sum(num_classes=2).to(device)
     print(model)
@@ -731,11 +757,52 @@ def mnist(args):
     # =======================
     print("\n=== POINTWISE PID ===")
 
-    pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes=10)
-    pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=10)
+    pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes=2)
+    pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2)
 
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
+
+    # =======================
+    # 9. Comparison with POINTWISE Human interpretation
+    # =======================
+    synergy_combinations = []
+    redundancy_combinations = []
+    unicity_0_combinations = []
+    unicity_1_combinations = []
+    for img_label, aud_label, pointwise_pid in zip(img_labels, audio_labels, pid):
+        if img_label + aud_label > cutoff_sum:
+            if img_label > cutoff_sum and aud_label > cutoff_sum:
+                redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+            elif img_label < cutoff_sum+1 and aud_label > cutoff_sum:
+                unicity_1_combinations.append(torch.tensor(pointwise_pids)[None, :])
+            elif img_label > cutoff_sum and aud_label < cutoff_sum+1:
+                unicity_0_combinations.append(torch.tensor(pointwise_pids)[None, :])
+            else:
+                synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+        else:
+            synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+
+    print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
+    print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
+    print("Unicity 0 Combinations:", torch.mean(torch.cat(unicity_0_combinations), dim=0))
+    print("Unicity 1 Combinations:", torch.mean(torch.cat(unicity_1_combinations), dim=0))
+
+    # POINTWISE COSINE SIMILARITY
+    list_of_pointwise_pids = [torch.cat(redundancy_combinations), torch.cat(unicity_0_combinations),
+                              torch.cat(unicity_1_combinations), torch.cat(synergy_combinations)]
+    list_pointwise_labels = [torch.cat([torch.tensor([0, 0, 1, 0])[None, :]] * len(list_of_pointwise_pids[0]), dim=0),
+                             torch.cat([torch.tensor([1, 0, 0, 0])[None, :]] * len(list_of_pointwise_pids[1]), dim=0),
+                             torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_of_pointwise_pids[2]), dim=0),
+                             torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_of_pointwise_pids[3]), dim=0)]
+
+    pid = torch.cat(list_of_pointwise_pids, dim=0)
+    pid_labels = torch.cat(list_pointwise_labels, dim=0)
+
+    pid_norm = normalize_pid(pid)
+    pid_labels_norm = normalize_pid(pid_labels)
+    sim = cosine_similarity(pid_norm, pid_labels_norm)
+    print("Mean true per-sample cosine similarity without source:", sim.mean())
 
 if __name__ == '__main__':
     args = config().parse_args()

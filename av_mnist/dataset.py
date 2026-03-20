@@ -49,7 +49,7 @@ class AV_dataset(Dataset):
 
 class AV_dataset_sum(Dataset):
 
-    def __init__(self, mnist_dataset, audio_dataset):
+    def __init__(self, mnist_dataset, audio_dataset, cutoff_sum):
         self.mnist_dataset = mnist_dataset
         self.audio_dataset = audio_dataset
 
@@ -71,7 +71,7 @@ class AV_dataset_sum(Dataset):
         # binary target based on digit sum
         digit_sum = img_label + audio_label
 
-        target = 1 if digit_sum > 6 else 0
+        target = 1 if digit_sum > cutoff_sum else 0
         target = torch.tensor(target, dtype=torch.long)
 
         return img, audio, target, img_label, audio_label
