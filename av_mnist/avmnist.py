@@ -506,6 +506,8 @@ def mnist(args):
     # =======================
     AV_train, AV_test = prepare_dataset(args)
 
+    device = "cuda"
+
     model = CNN().to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
