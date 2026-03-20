@@ -68,7 +68,7 @@ class MultimodalRepresentationsDataModule(pl.LightningDataModule):
 class MLP(nn.Module):
     """Two-layer perceptron used as prediction head."""
 
-    def __init__(self, indim, hiddim, outdim, dropout=True, dropoutp=0.1):
+    def __init__(self, indim, hiddim, outdim, dropout=False, dropoutp=0.1):
         super().__init__()
         self.fc1 = nn.Linear(indim, hiddim)
         self.fc2 = nn.Linear(hiddim, outdim)
@@ -231,7 +231,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
             sup_clip_loss = 100 * supclip_continuous(z0, z1, y, ids)
             align_loss = 1000 * (z0 - z1).norm(p=2, dim=1).pow(2).mean()
         elif self.distribution_target == "categorical":
-            pred_loss = F.cross_entropy(y_pred, y) + F.cross_entropy(y_pred_0, y) + F.cross_entropy(y_pred_1, y)
+            pred_loss = F.cross_entropy(y_pred_0, y) + F.cross_entropy(y_pred_1, y) # F.cross_entropy(y_pred, y) +
             sup_clip_loss = supervised_kernel_alignment(z0, z1, y) # supclip_categorical(z0, z1, y, ids)
             align_loss = self.lambda_reg*(z0 - z1).norm(p=2, dim=1).pow(2).mean()
         else:
@@ -262,7 +262,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
         ce1 = F.cross_entropy(y_pred_1, y, reduction="none")
 
         # mask: True where model 0 is worse (higher CE)
-        mask = ce0 > ce1  # shape: (batch,)
+        mask = ce0 < ce1  # shape: (batch,)
 
         worst_logits = torch.where(mask[:, None], y_pred_0, y_pred_1).detach()
 

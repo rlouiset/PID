@@ -221,10 +221,10 @@ def compute_pointwise_pid(dict_of_metrics, num_classes):
         modality1_ce = min(modality1_ce, h_y)
         redundancy_ce = min(redundancy_ce, h_y)"""
 
-        redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
+        """redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
 
         modality0_ce = max(modality0_ce, joint_ce)
-        modality1_ce = max(modality1_ce, joint_ce)
+        modality1_ce = max(modality1_ce, joint_ce)"""
 
         modality0_ce = min(modality0_ce, redundancy_ce)
         modality1_ce = min(modality1_ce, redundancy_ce)
