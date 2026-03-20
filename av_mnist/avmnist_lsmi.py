@@ -432,7 +432,7 @@ def mnist(args):
     # =======================
     # 2. TRAINING
     # =======================
-    for epoch in range(1, 10): # args.epoch + 1):
+    for epoch in range(1, args.epoch + 1):
 
         print(f"\n===== Epoch {epoch} =====")
 
@@ -512,6 +512,12 @@ def mnist(args):
 
     print("\nValidation PID:")
     r, u1, u2, s = LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
+
+    print("before adjustement")
+    print("r: ", np.mean(r))
+    print("u1: ", np.mean(u1))
+    print("u2: ", np.mean(u2))
+    print("s: ", np.mean(s))
 
     # RUS adjustement
     r, u1, u2, s = RUS_adjustment([torch.tensor(r), torch.tensor(u1), torch.tensor(u2), torch.tensor(s)])
