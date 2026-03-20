@@ -111,11 +111,10 @@ def load_fsdd():
 
 
 def prepare_dataset(args, cutoff_sum):
-    train_kwargs = {'batch_size': args.batch_size}
-    test_kwargs = {'batch_size': args.test_batch_size}
+    train_kwargs = {'batch_size': args.batch_size, 'shuffle': True}
+    test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': False}
     cuda_kwargs = {'num_workers': 0,
                    'pin_memory': True,
-                   'shuffle': False,
                    'drop_last': False}
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
@@ -770,7 +769,7 @@ def mnist(args):
     redundancy_combinations = []
     unicity_0_combinations = []
     unicity_1_combinations = []
-    for img_label, aud_label, pointwise_pid in zip(img_labels, audio_labels, pid):
+    for img_label, aud_label, pointwise_pid in zip(test_img_labels, test_audio_labels, pid):
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
                 redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
