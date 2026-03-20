@@ -406,6 +406,13 @@ def compute_PID_categorical_with_source_decomposition(
     print("S=", str(I_S)[:5])
     print("I=", str(I)[:5])
 
+def ce_per_sample(targets, probs, eps=1e-12):
+    """
+    Per-sample cross-entropy:
+        CE(x) = -log p(y|x)
+    """
+    probs = torch.clamp(probs, eps, 1.0)
+    return -torch.log(probs[torch.arange(len(targets)), targets])
 
 def compute_pointwise_information(ce_list, log_py):
     """
