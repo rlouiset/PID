@@ -144,7 +144,7 @@ def test_unit(model, device, loader, unimodal=None):
             labels = labels.to(device)
 
             if unimodal is None:
-                logits, _, _ = model(imgs, audios)
+                logits = model(imgs, audios)
             else:
                 logits = model(imgs, audios, unimodal)
 
