@@ -113,7 +113,7 @@ def load_fsdd():
 def prepare_dataset(args):
     train_kwargs = {'batch_size': args.batch_size}
     test_kwargs = {'batch_size': args.test_batch_size}
-    cuda_kwargs = {'num_workers': 15,
+    cuda_kwargs = {'num_workers': 0,
                    'pin_memory': True,
                    'shuffle': False,
                    'drop_last': False}
