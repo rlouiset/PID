@@ -571,6 +571,9 @@ def mnist(args):
     # =======================
     log_py = compute_log_py(y_test, num_classes=10)
 
+    print(vis_probs[:2])
+    print(aud_probs[:2])
+
     ce_list = compute_ce_from_probs(
         [vis_probs, aud_probs],
         y_test
@@ -583,6 +586,7 @@ def mnist(args):
     ccs = compute_ccs_and_selection(
         ce_list, same_sign, log_py
     )
+    print(ccs[:5])
 
     redundancy_pointwise_ce = ccs.numpy()
     redundancy_ce = ccs.mean().item()
