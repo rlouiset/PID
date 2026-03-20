@@ -570,6 +570,7 @@ def mnist(args):
     # =======================
     log_py = compute_log_py(y_test, num_classes=10)
     print(log_py[:10])
+    print(debug)
 
     print(vis_probs[:2])
     print(aud_probs[:2])
