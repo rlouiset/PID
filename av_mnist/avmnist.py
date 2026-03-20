@@ -28,7 +28,7 @@ def config():
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
     parser.add_argument('--epoch', type=int, default=30, metavar='N', help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.0004, metavar='LR', help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
     parser.add_argument('--log-interval', type=int, default=30, metavar='N',

@@ -106,8 +106,14 @@ def cosine_similarity(a, b):
     """
     Row-wise cosine similarity
     """
+    print(a.shape)
+    print(b.shape)
+
     a = a / np.linalg.norm(a, axis=1, keepdims=True)
     b = b / np.linalg.norm(b, axis=1, keepdims=True)
+
+    print(np.sum(a * b, axis=1).shape)
+
     return np.sum(a * b, axis=1)
 
 def get_mutual_info(dataloader, model, modality='modality_1', cfg=None):
