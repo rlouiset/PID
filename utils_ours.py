@@ -68,7 +68,7 @@ class MultimodalRepresentationsDataModule(pl.LightningDataModule):
 class MLP(nn.Module):
     """Two-layer perceptron used as prediction head."""
 
-    def __init__(self, indim, hiddim, outdim, dropout=False, dropoutp=0.1):
+    def __init__(self, indim, hiddim, outdim, dropout=True, dropoutp=0.1):
         super().__init__()
         self.fc1 = nn.Linear(indim, hiddim)
         self.fc2 = nn.Linear(hiddim, outdim)
