@@ -27,7 +27,7 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=50, metavar='N', help='number of epochs to train')
+    parser.add_argument('--epoch', type=int, default=30, metavar='N', help='number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
@@ -75,7 +75,7 @@ def load_fsdd():
 def prepare_dataset(args):
     train_kwargs = {'batch_size': args.batch_size}
     test_kwargs = {'batch_size': args.test_batch_size}
-    cuda_kwargs = {'num_workers': 0,
+    cuda_kwargs = {'num_workers': 15,
                    'pin_memory': True,
                    'shuffle': True}
     train_kwargs.update(cuda_kwargs)
@@ -225,20 +225,20 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         h_y = -log_py_i
 
         # ===== CLIPPING =====
-        modality0_ce = min(modality0_ce, h_y)
+        """modality0_ce = min(modality0_ce, h_y)
         modality1_ce = min(modality1_ce, h_y)
         redundancy_ce = min(redundancy_ce, h_y)
 
         redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
 
         modality0_ce = max(modality0_ce, joint_ce)
-        modality1_ce = max(modality1_ce, joint_ce)
+        modality1_ce = max(modality1_ce, joint_ce)"""
 
         """print("m0-: ", modality0_ce)
         print("m1-: ", modality1_ce)"""
 
-        modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)
+        """modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)"""
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
@@ -261,11 +261,11 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         if i > 10:
             print(debug)"""
 
-        """if s < 0:
+        if s < 0:
             r_val -= s
             u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
             u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
-            s = 0"""
+            s = 0
 
         pid_list.append([u0, u1, r_val, s])
 
@@ -328,11 +328,11 @@ def compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes):
 
         s = total - u0 - u1 - r_val
 
-        """if s < 0:
+        if s < 0:
             r_val -= s
             u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
             u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
-            s = 0"""
+            s = 0
 
         pid_list.append([u0, u1, r_val, s])
 
