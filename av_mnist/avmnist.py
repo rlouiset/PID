@@ -353,6 +353,8 @@ def compute_PID_categorical_with_source_decomposition(
     H_Y = compute_entropy_from_targets(targets, num_classes)
 
     print("H(Y)", H_Y)
+    print('')
+
     print("joint_ce", joint_ce)
     print("redundancy_ce", redundancy_ce)
     print("source redundancy_ce", source_redundancy_ce)
@@ -367,8 +369,8 @@ def compute_PID_categorical_with_source_decomposition(
     source_redundancy_ce = min(source_redundancy_ce, H_Y)
 
     # ===== 3. YOUR STRUCTURAL CONSTRAINTS =====
-    redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
-    source_redundancy_ce = max(source_redundancy_ce, joint_ce, modality0_ce, modality1_ce)
+    # redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
+    # source_redundancy_ce = max(source_redundancy_ce, joint_ce, modality0_ce, modality1_ce)
 
     # keep only shared redundancy
     redundancy_ce = min(redundancy_ce, source_redundancy_ce)
@@ -378,6 +380,13 @@ def compute_PID_categorical_with_source_decomposition(
 
     modality0_ce = min(modality0_ce, redundancy_ce)
     modality1_ce = min(modality1_ce, redundancy_ce)
+
+    print("after joint_ce", joint_ce)
+    print("after redundancy_ce", redundancy_ce)
+    print("after source redundancy_ce", source_redundancy_ce)
+    print("after modality0_ce", modality0_ce)
+    print("after modality1_ce", modality1_ce)
+    print('')
 
     # ===== 4. INFORMATION TERMS (FIXED) =====
     I = H_Y - joint_ce

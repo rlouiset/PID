@@ -85,6 +85,30 @@ def get_entropy(dataloader, model, modality='modality_1', cfg=None):
     info = torch.cat(info, dim=0).detach()
     return info
 
+def normalize_pid(pid):
+    """
+    Ensure valid PID:
+        - non-negative
+        - sums to 1
+    """
+    pid = np.maximum(pid, 0)
+
+    row_sums = pid.sum(axis=1, keepdims=True)
+    zero_rows = row_sums.squeeze() == 0
+
+    pid[zero_rows] = 1.0 / pid.shape[1]
+    pid /= pid.sum(axis=1, keepdims=True)
+
+    return pid
+
+
+def cosine_similarity(a, b):
+    """
+    Row-wise cosine similarity
+    """
+    a = a / np.linalg.norm(a, axis=1, keepdims=True)
+    b = b / np.linalg.norm(b, axis=1, keepdims=True)
+    return np.sum(a * b, axis=1)
 
 def get_mutual_info(dataloader, model, modality='modality_1', cfg=None):
     model.eval()
@@ -317,19 +341,7 @@ print("u1: ",np.mean(u1))
 print("u2: ",np.mean(u2))
 print("s: ",np.mean(s))
 
-# optional but usually important
-pid = np.maximum(pid, 0)
-row_sums = pid.sum(axis=1, keepdims=True)
-# Replace zero rows with uniform distribution
-zero_rows = row_sums.squeeze() == 0
-pid[zero_rows] = 1.0 / pid.shape[1]
-# Now renormalize safely
-pid_norm = pid / pid.sum(axis=1, keepdims=True)
+pid_norm = normalize_pid(pid)
 
-# L2 normalize both vectors
-pid_l2 = pid_norm / np.linalg.norm(pid_norm, axis=1, keepdims=True)
-weights_l2 = weights_val / np.linalg.norm(weights_val, axis=1, keepdims=True)
-
-sim_pointwise = np.sum(pid_l2 * weights_l2, axis=1)
-
-print("Mean true per-sample cosine similarity:", sim_pointwise.mean())
+sim = cosine_similarity(pid_norm, weights_val)
+print("Mean true per-sample cosine similarity without source:", sim.mean())
