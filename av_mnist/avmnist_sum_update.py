@@ -723,3 +723,10 @@ def mnist(args):
 
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
+
+if __name__ == '__main__':
+    args = config().parse_args()
+    torch.manual_seed(args.seed)
+
+    mnist(args)
+
