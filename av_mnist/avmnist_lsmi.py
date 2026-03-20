@@ -514,10 +514,10 @@ def mnist(args):
     r, u1, u2, s = LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
 
     print("before adjustement")
-    print("r: ", np.mean(r))
-    print("u1: ", np.mean(u1))
-    print("u2: ", np.mean(u2))
-    print("s: ", np.mean(s))
+    print("r: ", np.mean(r.detach().cpu().numpy()))
+    print("u1: ", np.mean(u1.detach().cpu().numpy()))
+    print("u2: ", np.mean(u2.detach().cpu().numpy()))
+    print("s: ", np.mean(s.detach().cpu().numpy()))
 
     # RUS adjustement
     r, u1, u2, s = RUS_adjustment([torch.tensor(r), torch.tensor(u1), torch.tensor(u2), torch.tensor(s)])
