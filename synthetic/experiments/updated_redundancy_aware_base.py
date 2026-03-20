@@ -127,17 +127,6 @@ def RUS_adjustment(rus):
     return r_adjusted, u_1_adjusted, u_2_adjusted, s_adjusted
 
 
-
-def EncourageAlignment(ce_weight=2, align_weight=args.weight, criterion=torch.nn.CrossEntropyLoss()):
-    def _actualfunc(pred, truth, args):
-        ce_loss = criterion(pred, truth)
-        outs = args['reps']
-        outs[0] = outs[0].view(-1,).cpu().detach().numpy()
-        outs[1] = outs[1].view(-1,).cpu().detach().numpy()
-        align_loss = np.dot(outs[0], outs[1])/(np.linalg.norm(outs[0])*np.linalg.norm(outs[1]))
-        return align_loss * align_weight + ce_loss * ce_weight
-    return _actualfunc
-
 def traditional_cross_entropy_from_probs(probs, targets, eps=1e-12):
     """
     probs:   (N, C) probabilities
@@ -150,6 +139,50 @@ def traditional_cross_entropy_from_probs(probs, targets, eps=1e-12):
     acc = (probs.argmax(dim=1) == targets).float().mean()
 
     return acc.item(), ce.item()
+
+def extract_split(model, loader, device):
+    d = extract_representations(model, loader, device)
+
+    X = {
+        "modality0": d["modality0"].float(),
+        "modality1": d["modality1"].float()
+    }
+    y = d["targets"].float()
+
+    return X, y
+
+
+def compute_redundancy_metrics(y_pred_dict):
+    results = {}
+    for key in ["modality0", "modality1", "average"]:
+        acc, ce = traditional_cross_entropy_from_probs(
+            softmax(y_pred_dict[key]),
+            y_pred_dict["targets"]
+        )
+        results[key] = {"accuracy": acc, "cross_entropy": ce}
+    return results
+
+
+def print_model_metrics(dict_of_metrics):
+    print(f"{'Model':<12s} | {'Acc':>8s} | {'CE':>8s}")
+    print("-" * 36)
+
+    print(f"{'Joint':<12s} | {dict_of_metrics['joint_acc']:8.4f} | {dict_of_metrics['joint_ce']:8.4f}")
+    print(f"{'Modality 0':<12s} | {dict_of_metrics['modalities_acc'][0]:8.4f} | {dict_of_metrics['modalities_ce'][0]:8.4f}")
+    print(f"{'Modality 1':<12s} | {dict_of_metrics['modalities_acc'][1]:8.4f} | {dict_of_metrics['modalities_ce'][1]:8.4f}")
+
+
+def print_redundancy_metrics(results):
+    mapping = {
+        "modality0": "Red Mod 0",
+        "modality1": "Red Mod 1",
+        "average": "Red Joint"
+    }
+
+    for key, name in mapping.items():
+        acc = results[key]["accuracy"]
+        ce = results[key]["cross_entropy"]
+        print(f"{name:<22s} | {acc:8.4f} | {ce:8.4f}")
 
 
 # Wrap main code to protect multiprocessing
@@ -168,10 +201,8 @@ if __name__ == "__main__":
         input_dims = args.input_dim * len(args.modalities)
     else:
         input_dims = args.input_dim
+
     encoders = [Linear(input_dim, args.hidden_dim).to(device) for input_dim in input_dims]
-    """encoders = [nn.Sequential(Linear(input_dim, args.hidden_dim).to(device),
-                                nn.ReLU(),
-                                Linear(args.hidden_dim, args.hidden_dim).to(device)) for input_dim in input_dims]"""
 
     heads = [MLP(args.n_latent, args.hidden_dim, args.num_classes).to(device) for input_dim in input_dims]
 
@@ -179,12 +210,7 @@ if __name__ == "__main__":
         Concat(),
         MLP3(len(args.modalities)*args.hidden_dim, args.n_latent, args.n_latent)
     ).to(device)
-    """fusion = FusionTransformerWrapper(args.hidden_dim,
-        n_heads=8,
-        n_layers=2,
-        fusion="concat",
-        pool="cls",
-        dropout=0.0)"""
+
     head = MLP(args.n_latent, args.hidden_dim, args.num_classes).to(device)
 
     # Training
@@ -206,79 +232,50 @@ if __name__ == "__main__":
     # Testing
     dict_of_metrics = test(model, testdata, no_robust=True, criterion=torch.nn.CrossEntropyLoss())
 
-    X_train_dict = extract_representations(model, traindata, device)
-    y_train = X_train_dict["targets"].float()
+    # Extract representations
+    X_train_dict, y_train = extract_split(model, traindata, device)
+    X_val_dict, y_val = extract_split(model, validdata, device)
+    X_test_dict, y_test = extract_split(model, testdata, device)
 
-    X_val_dict = extract_representations(model, validdata, device)
-    y_val = X_val_dict["targets"].float()
-
-    X_test_dict = extract_representations(model, testdata, device)
-    y_test = X_test_dict["targets"].float()
     weights_test = testdata.dataset.data["weights"]
 
-    X_train_dict = {
-        "modality0": X_train_dict["modality0"].float(),
-        "modality1": X_train_dict["modality1"].float()
-    }
+    # Redundancy evaluation
+    y_pred_dict = return_redundancy_test_performances(
+        X_train_dict,
+        X_val_dict,
+        X_test_dict,
+        y_train,
+        y_val,
+        y_test,
+        "redundancy",
+        distribution_target="categorical",
+        num_classes=args.num_classes
+    )
 
-    X_val_dict = {
-        "modality0": X_val_dict["modality0"].float(),
-        "modality1": X_val_dict["modality1"].float()
-    }
-
-    X_test_dict = {
-        "modality0": X_test_dict["modality0"].float(),
-        "modality1": X_test_dict["modality1"].float()
-    }
-
-    y_pred_dict = return_redundancy_test_performances(X_train_dict, X_val_dict, X_test_dict, y_train, y_val, y_test,
-                                                      "redundancy", distribution_target="categorical",
-                                                      num_classes=args.num_classes)
-
-    results = {}
-    for key in ["modality0", "modality1", "average"]:
-        print(y_pred_dict[key].shape)
-        acc, ce = traditional_cross_entropy_from_probs(softmax(y_pred_dict[key]), y_pred_dict["targets"])
-        results[key] = {"accuracy": acc, "cross_entropy": ce}
+    results = compute_redundancy_metrics(y_pred_dict)
 
     for k, v in results.items():
-        print("redundancy representations - " + f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")
+        print(f"redundancy representations - {k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")
 
     print('---')
 
-    print(f"{'Model':<12s} | {'Acc':>8s} | {'CE':>8s}")
-    print("-" * 36)
-
-    print(f"{'Joint':<12s} | {dict_of_metrics['joint_acc']:8.4f} | {dict_of_metrics['joint_ce']:8.4f}")
-    print(
-        f"{'Modality 0':<12s} | {dict_of_metrics['modalities_acc'][0]:8.4f} | {dict_of_metrics['modalities_ce'][0]:8.4f}")
-    print(
-        f"{'Modality 1':<12s} | {dict_of_metrics['modalities_acc'][1]:8.4f} | {dict_of_metrics['modalities_ce'][1]:8.4f}")
-
-    # ---------- REDUNDANCY REPRESENTATIONS ----------
-    results = {}
-    for key, name in [
-        ("modality0", "Red Mod 0"),
-        ("modality1", "Red Mod 1"),
-        ("average", "Red Joint")
-    ]:
-        acc, ce = traditional_cross_entropy_from_probs(
-            softmax(y_pred_dict[key]),
-            y_pred_dict["targets"]
-        )
-        results[name] = (acc, ce)
-
-    for name, (acc, ce) in results.items():
-        print(f"{name:<22s} | {acc:8.4f} | {ce:8.4f}")
+    print_model_metrics(dict_of_metrics)
 
     print('---')
 
-    compute_PID_categorical(dict_of_metrics["joint_ce"], dict_of_metrics["modalities_ce"][0],
-                            dict_of_metrics["modalities_ce"][1], results["Red Joint"][1],
-                            num_classes=args.num_classes)
+    print_redundancy_metrics(results)
+
+    compute_PID_categorical(
+        dict_of_metrics["joint_ce"],
+        dict_of_metrics["modalities_ce"][0],
+        dict_of_metrics["modalities_ce"][1],
+        max(results["modality0"]["cross_entropy"], results["modality1"]["cross_entropy"]),
+        num_classes=args.num_classes
+    )
 
     N = len(y_pred_dict["targets"])
 
+    # PointWise PID
     list_of_pointwise_pid = []
     for j_i, m0_i, m1_i, r_i, y_i in zip(dict_of_metrics["pred_joint"], dict_of_metrics["pred_modalities"][0],
                                 dict_of_metrics["pred_modalities"][1], y_pred_dict["average"], y_pred_dict["targets"]):
@@ -297,6 +294,8 @@ if __name__ == "__main__":
         list_of_pointwise_pid.append([m0_contribution, m1_contribution, r_contribution, s_contribution])
 
     list_of_pointwise_pid = np.array(list_of_pointwise_pid)
+
+    print(list_of_pointwise_pid[:5])
 
     # r, u0, u1, s = RUS_adjustment([list_of_pointwise_pid[:, 2], list_of_pointwise_pid[:, 0], list_of_pointwise_pid[:, 1], list_of_pointwise_pid[:, 0]])
     # list_of_pointwise_pid = np.array([u0, u1, r, s]).T

@@ -42,11 +42,8 @@ def test_unit(model, device, loader, unimodal=None):
             y = y.to(device)
 
             if unimodal is None:
-
                 logits, _, _ = model(x1, x2)
-
             else:
-
                 logits = model(x1, x2, unimodal)
 
             probs = torch.exp(logits)
@@ -66,15 +63,13 @@ def test_unit(model, device, loader, unimodal=None):
 
     return avg_acc, avg_ce
 
-class XORDataset(Dataset):
 
+class XNORDataset(Dataset):
     def __init__(self, n_samples=10000):
-
         self.x1 = torch.randint(0, 2, (n_samples, 1)).float()
         self.x2 = torch.randint(0, 2, (n_samples, 1)).float()
 
-        # XOR logic
-        self.y = ((self.x1 + self.x2) % 2).long().squeeze()
+        self.y = (self.x1 == self.x2).long().squeeze()
 
     def __len__(self):
         return len(self.y)
@@ -183,8 +178,8 @@ def extract_representations(model, loader, device):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-train_set = XORDataset(20000)
-test_set = XORDataset(5000)
+train_set = XNORDataset(20000)
+test_set = XNORDataset(5000)
 
 train_loader = DataLoader(train_set, batch_size=512, shuffle=True)
 test_loader = DataLoader(test_set, batch_size=512)
@@ -218,7 +213,7 @@ y_pred_dict = return_redundancy_test_performances(
     y_test,
     "redundancy",
     distribution_target="categorical",
-    lambda_reg = 50, num_classes = 2, h_dim = 1024
+    lambda_reg=10, num_classes=2, h_dim=1024
 )
 
 # ----- evaluate joint and unimodal performances -----

@@ -232,7 +232,6 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
             align_loss = 1000 * (z0 - z1).norm(p=2, dim=1).pow(2).mean()
         elif self.distribution_target == "categorical":
             pred_loss = F.cross_entropy(y_pred, y) + F.cross_entropy(y_pred_0, y) + F.cross_entropy(y_pred_1, y)
-            pred_align_loss = F.mse_loss(y_pred_0.squeeze(), y_pred_1.squeeze())
             sup_clip_loss = supervised_kernel_alignment(z0, z1, y) # supclip_categorical(z0, z1, y, ids)
             align_loss = self.lambda_reg*(z0 - z1).norm(p=2, dim=1).pow(2).mean()
         else:
@@ -257,12 +256,20 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
         self._shared_step(batch, "Val")
 
     def test_step(self, batch, batch_idx):
-        _, y_pred_0, y_pred_1, y_pred, y = self._shared_step(batch, "Test")
+        _, y_pred_0, y_pred_1, _, y = self._shared_step(batch, "Test")
+
+        ce0 = F.cross_entropy(y_pred_0, y, reduction="none")
+        ce1 = F.cross_entropy(y_pred_1, y, reduction="none")
+
+        # mask: True where model 0 is worse (higher CE)
+        mask = ce0 > ce1  # shape: (batch,)
+
+        worst_logits = torch.where(mask[:, None], y_pred_0, y_pred_1).detach()
 
         self.test_preds.append({
             "modality0": y_pred_0.detach().cpu(),
             "modality1": y_pred_1.detach().cpu(),
-            "average": y_pred.detach().cpu()
+            "average": worst_logits.detach().cpu()
         })
         self.test_targets.append(y.detach().cpu())
 
@@ -281,7 +288,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
 # Trainer helper
 # =========================
 def create_redundancy_trainer(
-    max_epochs=100,
+    max_epochs=5,
     config_name="model",
     accelerator: Literal["cpu", "gpu", "auto"] = "auto",
     checkpoint_dir="checkpoints",
@@ -361,33 +368,3 @@ def return_redundancy_test_performances(
     torch.cuda.empty_cache()
 
     return y_pred_dict
-
-def compute_PID_categorical(joint_ce, modality0_ce, modality1_ce, redundancy_ce, num_classes):
-    print("joint_ce", joint_ce)
-    print("redundancy_ce", redundancy_ce)
-    print("modality0_ce", modality0_ce)
-    print("modality1_ce", modality1_ce)
-
-    redundancy_ce = max(redundancy_ce, joint_ce)
-
-    modality0_ce = max(modality0_ce, joint_ce)
-    modality1_ce = max(modality1_ce, joint_ce)
-
-    modality0_ce = min(modality0_ce, redundancy_ce)
-    modality1_ce = min(modality1_ce, redundancy_ce)
-
-    # joint_ce = min(modality0_ce, modality1_ce, joint_ce)
-
-    I = log(num_classes) - joint_ce
-
-    I_R = log(num_classes) - redundancy_ce
-    I_U0 = (log(num_classes) - modality0_ce) - I_R
-    I_U1 = (log(num_classes) - modality1_ce) - I_R
-
-    I_S = max(0, I - I_U0 - I_U1 - I_R)
-
-    print("R=", I_R)
-    print("U0=", I_U0)
-    print("U1=", I_U1)
-    print("S=", I_S)
-    print("I=", I)
