@@ -569,6 +569,7 @@ def mnist(args):
     # 5. CCS REDUNDANCY
     # =======================
     log_py = compute_log_py(y_test, num_classes=10)
+    print(log_py[:10])
 
     print(vis_probs[:2])
     print(aud_probs[:2])
