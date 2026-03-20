@@ -772,15 +772,15 @@ def mnist(args):
     for img_label, aud_label, pointwise_pid in zip(test_img_labels, test_audio_labels, pid):
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
-                redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+                redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label < cutoff_sum+1 and aud_label > cutoff_sum:
-                unicity_1_combinations.append(torch.tensor(pointwise_pids)[None, :])
+                unicity_1_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label > cutoff_sum and aud_label < cutoff_sum+1:
-                unicity_0_combinations.append(torch.tensor(pointwise_pids)[None, :])
+                unicity_0_combinations.append(torch.tensor(pointwise_pid)[None, :])
             else:
-                synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+                synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
         else:
-            synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+            synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
 
     print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
     print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
