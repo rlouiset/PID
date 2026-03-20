@@ -73,10 +73,12 @@ def load_fsdd():
 
 
 def prepare_dataset(args):
-    train_kwargs = {'batch_size': args.batch_size, 'shuffle': True}
-    test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': False}
+    train_kwargs = {'batch_size': args.batch_size}
+    test_kwargs = {'batch_size': args.test_batch_size}
     cuda_kwargs = {'num_workers': 0,
-                   'pin_memory': True}
+                   'pin_memory': True,
+                   'shuffle': False,
+                   'drop_last': False}
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
     transform = transforms.Compose([
@@ -570,9 +572,6 @@ def mnist(args):
     # =======================
     log_py = compute_log_py(y_test, num_classes=10)
 
-    print(vis_probs[:2])
-    print(aud_probs[:2])
-
     ce_list = compute_ce_from_probs(
         [vis_probs, aud_probs],
         y_test
@@ -614,7 +613,7 @@ def mnist(args):
         y_test,
         "redundancy",
         distribution_target="categorical",
-        lambda_reg=1,
+        lambda_reg=10,
         num_classes=10
     )
 
