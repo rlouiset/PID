@@ -189,7 +189,7 @@ def test_unit(model, device, loader, unimodal=None):
     probs_list = []
 
     with torch.no_grad():
-        for imgs, audios, labels in loader:
+        for imgs, audios, labels, _, _ in loader:
 
             imgs = imgs.to(device)
             audios = audios.to(device)
