@@ -103,17 +103,25 @@ def test_unit(model, device, loader, unimodal=None):
     return avg_acc, avg_ce, torch.tensor(probs_list)
 
 class ORDataset(Dataset):
-    def __init__(self, n_samples=10000):
+    def __init__(self, n_samples=10000, noise_std=0.1):
         self.x1 = torch.randint(0, 2, (n_samples, 1)).float()
         self.x2 = torch.randint(0, 2, (n_samples, 1)).float()
 
         self.y = ((self.x1 + self.x2) > 0).long().squeeze()
+        self.noise_std = noise_std
 
     def __len__(self):
         return len(self.y)
 
     def __getitem__(self, idx):
-        return self.x1[idx], self.x2[idx], self.y[idx]
+        x1 = self.x1[idx]
+        x2 = self.x2[idx]
+
+        noise1 = torch.randn_like(x1) * self.noise_std
+        noise2 = torch.randn_like(x2) * self.noise_std
+
+        return x1 + noise1, x2 + noise2, self.y[idx]
+
 
 class LogicNet(nn.Module):
 
@@ -300,9 +308,6 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
 
-        """print("m0-: ", modality0_ce)
-        print("m1-: ", modality1_ce)"""
-
         modality0_ce = min(modality0_ce, redundancy_ce)
         modality1_ce = min(modality1_ce, redundancy_ce)
 
@@ -327,11 +332,11 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         if i > 10:
             print(debug)"""
 
-        """if s < 0:
+        if s < 0:
             r_val -= s
             u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
             u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
-            s = 0"""
+            s = 0
 
         pid_list.append([u0, u1, r_val, s])
 
@@ -641,19 +646,6 @@ print(np.mean(pid_source, axis=0))
 # ========= 9. POINTWISE PID WITHOUT SOURCE =========
 pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes)
 print(np.mean(pid, axis=0))
-
-pid = - (torch.tensor(pid) + log_py[:, None])
-print(np.mean(pid.numpy(), axis=0))
-
-compute_PID_categorical_with_source_decomposition(
-    np.mean(pid.numpy(), axis=0)[-1],
-    np.mean(pid.numpy(), axis=0)[0],
-    np.mean(pid.numpy(), axis=0)[1],
-    np.mean(pid.numpy(), axis=0)[2],
-    dict_of_metrics["source_redundancy_pointwise_ce"],
-    num_classes=num_classes,
-    targets=dict_of_metrics["true_labels"]
-)
 
 """print(test_set.x1[0:15, 0])
 print(test_set.x2[0:15, 0])"""

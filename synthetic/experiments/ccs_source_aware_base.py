@@ -232,18 +232,24 @@ def compute_pointwise_pid(dict_of_metrics, num_classes):
         # ===== INFORMATION =====
         total = h_y - joint_ce
 
-        # your design choice: strongest redundancy
+        # compute redundancy
         r_val = h_y - redundancy_ce
 
-        u0 = max(0, h_y - modality0_ce - r_val)
-        u1 = max(0, h_y - modality1_ce - r_val)
+        u0 = h_y - modality0_ce - r_val
+        u1 = h_y - modality1_ce - r_val
+
+        """if r_val < 0:
+            if u0 < 0 and u1 < 0:
+                r_val -= 2*max(u0, u1)
+                u0 -= max(u0, u1)
+                u1 -= max(u0, u1)"""
 
         s = total - u0 - u1 - r_val
 
         if s < 0:
             r_val -= s
-            u0 = max(0, h_y - modality0_ce - r_val)
-            u1 = max(0, h_y - modality1_ce - r_val)
+            u0 = h_y - modality0_ce - r_val
+            u1 = h_y - modality1_ce - r_val
             s = 0
 
         pid_list.append([u0, u1, r_val, s])
@@ -503,7 +509,7 @@ if __name__ == "__main__":
     dict_of_metrics["redundancy_ce"] = ccs.mean().item()
     dict_of_metrics["redundancy_pointwise_ce"] = ccs.numpy()
 
-    # ========= 7. SOURCE REDUNDANCY =========
+    """# ========= 7. SOURCE REDUNDANCY =========
     y_pred_dict = return_redundancy_test_performances(
         X_train_dict, X_val_dict, X_test_dict,
         y_train, y_val, y_test,
@@ -546,7 +552,7 @@ if __name__ == "__main__":
     print(np.mean(pid_source, axis=0))
     pid_norm = normalize_pid(pid_source)
     sim = cosine_similarity(pid_norm, weights_test)
-    print("Mean true per-sample cosine similarity with source:", sim.mean())
+    print("Mean true per-sample cosine similarity with source:", sim.mean())"""
 
     # ========= 9. POINTWISE PID WITHOUT SOURCE =========
     pid = compute_pointwise_pid(dict_of_metrics, args.num_classes)

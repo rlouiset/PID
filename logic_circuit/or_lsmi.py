@@ -11,8 +11,6 @@ import numpy as np
 from torch.utils.data import DataLoader
 import torch.optim as optim
 
-from utils_ours import return_redundancy_test_performances, compute_PID_categorical
-
 from utils_lsmi import MargKernel, cls_network
 from utils_lsmi import get_loader, setup_seed
 
@@ -283,7 +281,7 @@ def test_unit(model, device, loader, unimodal=None):
     return avg_acc, avg_ce
 
 class ORDataset(Dataset):
-    def __init__(self, n_samples=10000, noise_std=0.05):
+    def __init__(self, n_samples=10000, noise_std=0.1):
         self.x1 = torch.randint(0, 2, (n_samples, 1)).float()
         self.x2 = torch.randint(0, 2, (n_samples, 1)).float()
 
