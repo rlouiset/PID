@@ -226,8 +226,8 @@ def compute_pointwise_pid(dict_of_metrics, num_classes):
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
 
-        """modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)"""
+        modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
@@ -239,11 +239,11 @@ def compute_pointwise_pid(dict_of_metrics, num_classes):
 
         s = total - u0 - u1 - r_val
 
-        """if s < 0:
+        if s < 0:
             r_val -= s
             u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
             u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
-            s = 0"""
+            s = 0
 
         pid_list.append([u0, u1, r_val, s])
 
