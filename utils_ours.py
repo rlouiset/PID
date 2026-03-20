@@ -104,7 +104,6 @@ class RedundancyRepresentationModel(nn.Module):
         )
 
         self.head = MLP(latdim, hdim, num_classes)
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, modality0, modality1):
         z0 = self.projector_0(modality0)
@@ -262,7 +261,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
         ce1 = F.cross_entropy(y_pred_1, y, reduction="none")
 
         # mask: True where model 0 is worse (higher CE)
-        mask = ce0 < ce1  # shape: (batch,)
+        mask = ce0 > ce1  # shape: (batch,)
 
         worst_logits = torch.where(mask[:, None], y_pred_0, y_pred_1).detach()
 

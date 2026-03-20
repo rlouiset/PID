@@ -27,7 +27,7 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=30, metavar='N', help='number of epochs to train')
+    parser.add_argument('--epoch', type=int, default=5, metavar='N', help='number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.0004, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
@@ -603,6 +603,8 @@ def mnist(args):
         "modality1": test_aud.float()
     }
 
+    print(y_test[:20])
+
     y_pred_dict = return_redundancy_test_performances(
         X_train_dict,
         X_test_dict,
@@ -612,7 +614,7 @@ def mnist(args):
         y_test,
         "redundancy",
         distribution_target="categorical",
-        lambda_reg=1,
+        lambda_reg=10,
         num_classes=10
     )
 
