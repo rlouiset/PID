@@ -324,9 +324,6 @@ LSMI_estimation(train_loader, discriminator, entropy_estimator, cfg)
 print("\nValidation PID:")
 r, u1, u2, s = LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
 
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-
 # stack PID atoms in the same order as weights
 pid = np.stack([u1, u2, r, s], axis=1)   # shape (N, 4)
 
