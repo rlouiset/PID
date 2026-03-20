@@ -217,17 +217,17 @@ def compute_pointwise_pid(dict_of_metrics, num_classes):
         h_y = -log_py_i
 
         # ===== CLIPPING =====
-        """modality0_ce = min(modality0_ce, h_y)
+        modality0_ce = min(modality0_ce, h_y)
         modality1_ce = min(modality1_ce, h_y)
-        redundancy_ce = min(redundancy_ce, h_y)"""
+        redundancy_ce = min(redundancy_ce, h_y)
 
-        """redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
+        redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
 
         modality0_ce = max(modality0_ce, joint_ce)
-        modality1_ce = max(modality1_ce, joint_ce)"""
+        modality1_ce = max(modality1_ce, joint_ce)
 
-        modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)
+        """modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)"""
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
