@@ -56,10 +56,10 @@ class MultimodalRepresentationsDataModule(pl.LightningDataModule):
         return DataLoader(self.train_ds, batch_size=self.batch_size, shuffle=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=self.batch_size)
+        return DataLoader(self.val_ds, batch_size=self.batch_size, shuffle=False)
 
     def test_dataloader(self):
-        return DataLoader(self.test_ds, batch_size=self.batch_size)
+        return DataLoader(self.test_ds, batch_size=self.batch_size, shuffle=False)
 
 
 # =========================
