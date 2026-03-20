@@ -444,6 +444,20 @@ def compute_ccs_and_selection(ce_list, same_sign, log_py):
 
     return ccs
 
+def compute_log_py(targets, num_classes):
+    """
+    Compute log p(y) for each sample
+    """
+    counts = torch.bincount(targets, minlength=num_classes).float()
+    probs = counts / counts.sum()
+    probs = torch.clamp(probs, 1e-12, 1.0)
+
+    log_py_all = torch.log(probs)  # shape (C,)
+
+    # map to each sample
+    return log_py_all[targets]     # shape (N,)
+
+
 def logp(p):
     return torch.log(torch.clamp(p, 1e-12, 1.0))
 
