@@ -29,7 +29,7 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=75, metavar='N', help='number of epochs to train')
+    parser.add_argument('--epoch', type=int, default=2, metavar='N', help='number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
@@ -551,6 +551,7 @@ def cosine_similarity(a, b):
     """
     a = a / np.linalg.norm(a, axis=1, keepdims=True)
     b = b / np.linalg.norm(b, axis=1, keepdims=True)
+    print((a*b).shape)
     return np.sum(a * b, axis=1)
 
 def compute_entropy_from_targets(targets, num_classes):
@@ -798,8 +799,18 @@ def mnist(args):
     pid = torch.cat(list_of_pointwise_pids, dim=0).float()
     pid_labels = torch.cat(list_pointwise_labels, dim=0).float()
 
+    print(pid.shape)
+
     pid_norm = normalize_pid(pid)
+
+    print(pid_norm.shape)
+
+    print(pid_labels.shape)
+
     pid_labels_norm = normalize_pid(pid_labels)
+
+    print(pid_labels_norm.shape)
+
     sim = cosine_similarity(pid_norm, pid_labels_norm)
     print("Mean true per-sample cosine similarity without source:", sim.mean())
 
