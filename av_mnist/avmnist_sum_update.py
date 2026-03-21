@@ -756,8 +756,8 @@ def mnist(args):
     # =======================
     print("\n=== POINTWISE PID ===")
 
-    pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes=2)
-    pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2)
+    pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes=2).float()
+    pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2).float()
 
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
@@ -795,8 +795,8 @@ def mnist(args):
                              torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_of_pointwise_pids[2]), dim=0),
                              torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_of_pointwise_pids[3]), dim=0)]
 
-    pid = torch.cat(list_of_pointwise_pids, dim=0)
-    pid_labels = torch.cat(list_pointwise_labels, dim=0)
+    pid = torch.cat(list_of_pointwise_pids, dim=0).float()
+    pid_labels = torch.cat(list_pointwise_labels, dim=0).float()
 
     pid_norm = normalize_pid(pid)
     pid_labels_norm = normalize_pid(pid_labels)
