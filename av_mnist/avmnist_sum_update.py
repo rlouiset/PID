@@ -276,28 +276,28 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         h_y = -log_py_i
 
         # ===== CLIPPING =====
-        """modality0_ce = min(modality0_ce, h_y)
+        modality0_ce = min(modality0_ce, h_y)
         modality1_ce = min(modality1_ce, h_y)
         redundancy_ce = min(redundancy_ce, h_y)
 
         redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
 
         modality0_ce = max(modality0_ce, joint_ce)
-        modality1_ce = max(modality1_ce, joint_ce)"""
+        modality1_ce = max(modality1_ce, joint_ce)
 
         """print("m0-: ", modality0_ce)
         print("m1-: ", modality1_ce)"""
 
-        """modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)"""
+        modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
 
         r_val = h_y - redundancy_ce
 
-        u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
-        u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
+        u0 = max(0, h_y - modality0_ce - r_val)
+        u1 = max(0, h_y - modality1_ce - r_val)
 
         s = total - u0 - u1 - r_val
 
@@ -314,8 +314,8 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
 
         if s < 0:
             r_val -= s
-            u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
-            u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
+            u0 = max(0, h_y - modality0_ce - r_val)
+            u1 = max(0, h_y - modality1_ce - r_val)
             s = 0
 
         pid_list.append([u0, u1, r_val, s])
@@ -381,8 +381,8 @@ def compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes):
 
         if s < 0:
             r_val -= s
-            u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
-            u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
+            u0 = max(0, h_y - modality0_ce - r_val)
+            u1 = max(0, h_y - modality1_ce - r_val)
             s = 0
 
         pid_list.append([u0, u1, r_val, s])
@@ -602,7 +602,7 @@ def extract_representations(model, loader, device):
     return visual_repr, audio_repr, labels, img_labels, audio_labels
 
 def mnist(args):
-    cutoff_sum = 8
+    cutoff_sum = 6
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     model = CNN_sum(num_classes=2).to(device)
@@ -799,17 +799,8 @@ def mnist(args):
     pid = torch.cat(list_of_pointwise_pids, dim=0).float()
     pid_labels = torch.cat(list_pointwise_labels, dim=0).float()
 
-    print(pid.shape)
-
     pid_norm = normalize_pid(pid)
-
-    print(pid_norm.shape)
-
-    print(pid_labels.shape)
-
     pid_labels_norm = normalize_pid(pid_labels)
-
-    print(pid_labels_norm.shape)
 
     sim = cosine_similarity(pid_norm.numpy(), pid_labels_norm.numpy())
     print("Mean true per-sample cosine similarity without source:", sim.mean())
