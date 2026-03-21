@@ -602,7 +602,7 @@ def extract_representations(model, loader, device):
     return visual_repr, audio_repr, labels, img_labels, audio_labels
 
 def mnist(args):
-    cutoff_sum = 7
+    cutoff_sum = 8
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     model = CNN_sum(num_classes=2).to(device)
