@@ -756,8 +756,8 @@ def mnist(args):
     # =======================
     print("\n=== POINTWISE PID ===")
 
-    pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes=2).float()
-    pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2).float()
+    pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes=2)
+    pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2)
 
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
