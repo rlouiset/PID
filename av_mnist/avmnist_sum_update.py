@@ -811,7 +811,7 @@ def mnist(args):
 
     print(pid_labels_norm.shape)
 
-    sim = cosine_similarity(pid_norm, pid_labels_norm)
+    sim = cosine_similarity(pid_norm.numpy(), pid_labels_norm.numpy())
     print("Mean true per-sample cosine similarity without source:", sim.mean())
 
 if __name__ == '__main__':
