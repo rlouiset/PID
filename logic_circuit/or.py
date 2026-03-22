@@ -299,44 +299,34 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         h_y = -log_py_i
 
         # ===== CLIPPING =====
-        modality0_ce = min(modality0_ce, h_y)
-        modality1_ce = min(modality1_ce, h_y)
+        """modality0_ce = min(modality0_ce, h_y)
+        modality1_ce = min(modality1_ce, h_y)"""
         redundancy_ce = min(redundancy_ce, h_y)
 
-        redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
+        redundancy_ce = max(redundancy_ce, joint_ce)
 
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
 
-        modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)
+        """modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)"""
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
 
+        # compute redundancy
         r_val = h_y - redundancy_ce
 
-        u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
-        u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
+        u0 = h_y - modality0_ce - r_val
+        u1 = h_y - modality1_ce - r_val
 
         s = total - u0 - u1 - r_val
 
-        """print("m0+: ", modality0_ce)
-        print("m1+: ", modality1_ce)
-        print("r: ", redundancy_ce)
-        print("hy: ", h_y)
-        print("u0: ", u0)
-        print("u1: ", u1)
-        print('')
-
-        if i > 10:
-            print(debug)"""
-
-        if s < 0:
+        """if s < 0:
             r_val -= s
             u0 = h_y - modality0_ce - r_val # max(0, h_y - modality0_ce - r_val)
             u1 = h_y - modality1_ce - r_val # max(0, h_y - modality1_ce - r_val)
-            s = 0
+            s = 0"""
 
         pid_list.append([u0, u1, r_val, s])
 
@@ -572,18 +562,6 @@ X_test_dict = {
     "modality1": test_z2.float()
 }
 
-y_pred_dict = return_redundancy_test_performances(
-    X_train_dict,
-    X_test_dict,
-    X_test_dict,
-    y_train,
-    y_test,
-    y_test,
-    "redundancy",
-    distribution_target="categorical",
-    num_classes=num_classes, h_dim=1024
-)
-
 
 log_py = compute_log_py(y_test, num_classes)
 logits_list = [m1_probs, m2_probs]
@@ -610,6 +588,17 @@ dict_of_metrics = {"joint_ce": joint_ce,
                    "redundancy_pointwise_ce": redundancy_pointwise_ce,
                    "true_labels": y_test,}
 
+"""y_pred_dict = return_redundancy_test_performances(
+    X_train_dict,
+    X_test_dict,
+    X_test_dict,
+    y_train,
+    y_test,
+    y_test,
+    "redundancy",
+    distribution_target="categorical",
+    num_classes=num_classes, h_dim=1024
+)
 
 def compute_redundancy_metrics(y_pred_dict):
     results = {}
@@ -641,7 +630,7 @@ compute_PID_categorical_with_source_decomposition(
 
 # ========= 9. POINTWISE PID WITH SOURCE =========
 pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes)
-print(np.mean(pid_source, axis=0))
+print(np.mean(pid_source, axis=0))"""
 
 # ========= 9. POINTWISE PID WITHOUT SOURCE =========
 pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes)
