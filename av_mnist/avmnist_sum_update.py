@@ -259,8 +259,8 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
 
-        modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)
+        """modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)"""
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
