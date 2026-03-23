@@ -783,7 +783,7 @@ def mnist(args):
                 print(aud_label)
                 print(ce_list_0)
                 print(ce_list_1)
-                print(ccs)
+                print(ccs_i)
                 print(pointwise_pid)
                 print('---')
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
