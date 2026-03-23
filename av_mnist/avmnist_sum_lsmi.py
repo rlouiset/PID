@@ -265,7 +265,7 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=75, metavar='N', help='number of epochs to train')
+    parser.add_argument('--epoch', type=int, default=50, metavar='N', help='number of epochs to train')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
@@ -427,7 +427,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         print('---')
 
         if epoch > 25:
-            loss = F.nll_loss(output, labels)
+            loss += F.nll_loss(output, labels)
             loss += F.nll_loss(output_img, labels)
             loss += F.nll_loss(output_aud, labels)
         if batch_idx == 0:
@@ -544,7 +544,7 @@ def mnist(args):
     # =======================
     # 2. MODEL
     # =======================
-    model = CNN_sum(num_classes=2).to(device)
+    model = CNN_sum(num_classes=2, emb_dim=512).to(device)
     print(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
