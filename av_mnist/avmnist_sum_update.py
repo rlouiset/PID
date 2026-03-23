@@ -300,8 +300,8 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
 
         if s < 0:
             r_val -= s
-            u0 = max(0, h_y - modality0_ce - r_val)
-            u1 = max(0, h_y - modality1_ce - r_val)
+            u0 = h_y - modality0_ce - r_val
+            u1 = h_y - modality1_ce - r_val
             s = 0
 
         pid_list.append([u0, u1, r_val, s])
@@ -699,7 +699,7 @@ def mnist(args):
 
     print(y_test[:20])
 
-    y_pred_dict = return_redundancy_test_performances(
+    """y_pred_dict = return_redundancy_test_performances(
         X_train_dict,
         X_train_dict,
         X_test_dict,
@@ -722,7 +722,7 @@ def mnist(args):
 
     print("\n=== Learned redundancy performances ===")
     for k, v in results.items():
-        print(f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")
+        print(f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")"""
 
     # =======================
     # 7. BUILD METRICS DICT
@@ -741,14 +741,14 @@ def mnist(args):
 
         "true_labels": y_test,
 
-        "source_redundancy_pointwise_ce": results["average"]["cross_entropy"],
-        "source_redundancy_preds": y_pred_dict["average"]
+        #"source_redundancy_pointwise_ce": results["average"]["cross_entropy"],
+        #"source_redundancy_preds": y_pred_dict["average"]
     }
 
     # =======================
     # 8. GLOBAL PID
     # =======================
-    print("\n=== GLOBAL PID (WITH SOURCE) ===")
+    """print("\n=== GLOBAL PID (WITH SOURCE) ===")
 
     compute_PID_categorical_with_source_decomposition(
         joint_ce,
@@ -758,7 +758,7 @@ def mnist(args):
         results["average"]["cross_entropy"],
         num_classes=2,
         targets=y_test
-    )
+    )"""
 
     # =======================
     # 9. POINTWISE PID
@@ -766,7 +766,7 @@ def mnist(args):
     print("\n=== POINTWISE PID ===")
 
     pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes=2)
-    pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2)
+    # pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2)
 
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
