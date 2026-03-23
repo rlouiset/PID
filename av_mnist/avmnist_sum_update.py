@@ -779,6 +779,9 @@ def mnist(args):
     unicity_0_combinations = []
     unicity_1_combinations = []
     for img_label, aud_label, pointwise_pid, ce_list_i in zip(test_img_labels, test_audio_labels, pid, ce_list):
+        print(img_label)
+        print(aud_label)
+        print("---")
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
                 print(img_label)
