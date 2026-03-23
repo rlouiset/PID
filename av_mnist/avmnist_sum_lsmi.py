@@ -231,18 +231,20 @@ def estimation_main(cfg, feature_dir=None):
     LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
 
 def pad_or_crop(spec):
-    # spec shape: (n_mels, time)
     n_mels, T = spec.shape
 
     if T > TARGET_FRAMES:
-        spec = spec[:, :TARGET_FRAMES]  # crop
+        # random crop instead of left crop
+        start = np.random.randint(0, T - TARGET_FRAMES + 1)
+        spec = spec[:, start:start + TARGET_FRAMES]
 
     elif T < TARGET_FRAMES:
         pad = TARGET_FRAMES - T
-        spec = F.pad(spec, (0, pad))  # pad time dimension
+        left = pad // 2
+        right = pad - left
+        spec = F.pad(spec, (left, right))
 
     return spec
-
 
 def traditional_cross_entropy_from_probs(probs, targets, eps=1e-12):
     probs = torch.clamp(probs, min=eps, max=1.0)
@@ -313,6 +315,21 @@ def display(X):
     plt.imshow(img, cmap='gray')
     plt.show()
 
+def normalize_spec(spec):
+    mean = spec.mean()
+    std = spec.std() + 1e-6
+    return (spec - mean) / std
+
+def add_noise(spec, noise_level=0.02):
+    noise = torch.randn_like(spec) * noise_level
+    return spec + noise
+
+
+def augment(spec):
+    if np.random.rand() < 0.5:
+        spec = add_noise(spec)
+
+    return spec
 
 def load_fsdd():
     from torchfsdd import TorchFSDDGenerator, TrimSilence
@@ -332,7 +349,11 @@ def load_fsdd():
 
         AmplitudeToDB(),
 
-        pad_or_crop
+        pad_or_crop,
+
+        augment,
+
+        normalize_spec,
     ])
 
     # Initialize a generator for a local version of FSDD
@@ -341,7 +362,7 @@ def load_fsdd():
                               load_all=True)  # '/Users/robinlouiset/Documents/torch-fsdd/lib/test/data/v1.0.10'
 
     # Create two Torch datasets for a train-test split from the generator
-    train_set, test_set = fsdd.train_test_split(test_size=0.2)
+    train_set, test_set = fsdd.train_test_split(test_size=0.1)
     return train_set, test_set
 
 def prepare_dataset(args, cutoff_sum):
@@ -397,7 +418,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         print('---')
 
         if epoch > 25:
-            loss += F.nll_loss(output, labels)
+            loss = F.nll_loss(output, labels)
             loss += F.nll_loss(output_img, labels)
             loss += F.nll_loss(output_aud, labels)
         if batch_idx == 0:
@@ -508,7 +529,7 @@ def mnist(args):
     # =======================
     # 1. DATA
     # =======================
-    cutoff_sum = 8
+    cutoff_sum = 7
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     # =======================
@@ -545,7 +566,7 @@ def mnist(args):
     # =======================
     # SAVE MODEL
     # =======================
-    save_path = "cnn_sum_model.pt"
+    save_path = "cnn_sum7_model.pt"
 
     torch.save({
         'model_state_dict': model.state_dict(),
