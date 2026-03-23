@@ -588,7 +588,7 @@ def extract_representations(model, loader, device):
     return visual_repr, audio_repr, labels, img_labels, audio_labels
 
 def mnist(args):
-    cutoff_sum = 6
+    cutoff_sum = 7
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     model = CNN_sum(num_classes=2).to(device)
@@ -619,7 +619,7 @@ def mnist(args):
             f"Audio Acc: {test_metrics['aud_acc']:.4f}"
         )"""
 
-    checkpoint = torch.load("cnn_sum6_model.pt", map_location=device)
+    checkpoint = torch.load("cnn_sum7_model.pt", map_location=device)
 
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -769,7 +769,7 @@ def mnist(args):
     # pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2)
 
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
-    print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
+    # print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
 
     # =======================
     # 9. Comparison with POINTWISE Human interpretation
@@ -778,9 +778,14 @@ def mnist(args):
     redundancy_combinations = []
     unicity_0_combinations = []
     unicity_1_combinations = []
-    for img_label, aud_label, pointwise_pid in zip(test_img_labels, test_audio_labels, pid):
+    for img_label, aud_label, pointwise_pid, ce_list_i in zip(test_img_labels, test_audio_labels, pid, ce_list):
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
+                print(img_label)
+                print(aud_label)
+                print(ce_list)
+                print(pointwise_pid)
+                print('---')
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label < cutoff_sum+1 and aud_label > cutoff_sum:
                 unicity_1_combinations.append(torch.tensor(pointwise_pid)[None, :])
@@ -790,6 +795,7 @@ def mnist(args):
                 synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
         else:
             synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
+    print(debug)
 
     print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
     print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
