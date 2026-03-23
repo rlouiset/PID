@@ -781,24 +781,17 @@ def mnist(args):
     redundancy_combinations = []
     unicity_0_combinations = []
     unicity_1_combinations = []
-    for img_label, aud_label, pointwise_pid, ce_list_i in zip(test_img_labels, test_audio_labels, pid, ce_list):
-        print(img_label)
-        print(aud_label)
-        print("---")
+    for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1 in zip(test_img_labels, test_audio_labels, pid, ce_list[0], ce_list[1]):
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
-                """print(img_label)
+                print(img_label)
                 print(aud_label)
-                print(ce_list)
+                print(ce_list_0)
+                print(ce_list_1)
                 print(pointwise_pid)
-                print('---')"""
+                print('---')
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label < cutoff_sum+1 and aud_label > cutoff_sum:
-                """print(img_label)
-                print(aud_label)
-                print(ce_list)
-                print(pointwise_pid)
-                print('---')"""
                 unicity_1_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label > cutoff_sum and aud_label < cutoff_sum+1:
                 unicity_0_combinations.append(torch.tensor(pointwise_pid)[None, :])
