@@ -599,7 +599,7 @@ def mnist(args):
     # =======================
     # 2. TRAINING
     # =======================
-    for epoch in range(1, args.epoch + 1):
+    """for epoch in range(1, args.epoch + 1):
 
         print(f"\n===== Epoch {epoch} =====")
 
@@ -617,7 +617,29 @@ def mnist(args):
             f"Joint Acc: {test_metrics['joint_acc']:.4f} | "
             f"Visual Acc: {test_metrics['vis_acc']:.4f} | "
             f"Audio Acc: {test_metrics['aud_acc']:.4f}"
-        )
+        )"""
+
+    checkpoint = torch.load("cnn_sum6_model.pt", map_location=device)
+
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    model.eval()
+
+    test_metrics = test(model, device, AV_test)
+
+    print(
+        f"Joint CE: {test_metrics['joint_ce']:.4f} | "
+        f"Visual CE: {test_metrics['vis_ce']:.4f} | "
+        f"Audio CE: {test_metrics['aud_ce']:.4f}"
+    )
+
+    print(
+        f"Joint Acc: {test_metrics['joint_acc']:.4f} | "
+        f"Visual Acc: {test_metrics['vis_acc']:.4f} | "
+        f"Audio Acc: {test_metrics['aud_acc']:.4f}"
+    )
+
     train_vis, train_aud, y_train, train_img_labels, train_audio_labels = extract_representations(model, AV_train, device)
     test_vis, test_aud, y_test, test_img_labels, test_audio_labels = extract_representations(model, AV_test, device)
 
