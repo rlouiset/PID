@@ -771,8 +771,8 @@ def mnist(args):
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     # print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
 
-    print(test_img_labels[:10])
-    print(test_audio_labels[:10])
+    print(log_py[:20])
+    print(debug)
 
     # =======================
     # 9. Comparison with POINTWISE Human interpretation
