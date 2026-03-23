@@ -788,6 +788,11 @@ def mnist(args):
                 print('---')
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label < cutoff_sum+1 and aud_label > cutoff_sum:
+                print(img_label)
+                print(aud_label)
+                print(ce_list)
+                print(pointwise_pid)
+                print('---')
                 unicity_1_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label > cutoff_sum and aud_label < cutoff_sum+1:
                 unicity_0_combinations.append(torch.tensor(pointwise_pid)[None, :])
