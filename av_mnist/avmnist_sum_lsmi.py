@@ -411,49 +411,64 @@ def train(args, model, device, train_loader, optimizer, epoch):
     return Ls
 
 
-def test_unit(model, device, test_loader, unimodal=None):
+def test_unit(model, device, loader, unimodal=None):
+
     model.eval()
 
     total_acc = 0
     total_ce = 0
     total_n = 0
 
+    probs_list = []
+
     with torch.no_grad():
-        for imgs, audios, labels, _, _ in test_loader:
+        for imgs, audios, labels, _, _ in loader:
+
             imgs = imgs.to(device)
             audios = audios.to(device)
             labels = labels.to(device)
 
-            logits = model(imgs, audios, unimodal)
+            if unimodal is None:
+                logits = model(imgs, audios)
+            else:
+                logits = model(imgs, audios, unimodal)
 
             probs = torch.exp(logits)
+
+            probs_list.append(probs.cpu())
 
             acc, ce = traditional_cross_entropy_from_probs(probs, labels)
 
             batch_size = labels.size(0)
-
             total_acc += acc * batch_size
             total_ce += ce * batch_size
             total_n += batch_size
 
-    avg_acc = total_acc / total_n
-    avg_ce = total_ce / total_n
-
-    print(
-        "[{} testset] CE: {:.4f}, Accuracy: {:.4f}".format(
-            unimodal, avg_ce, avg_acc
-        )
+    return (
+        total_acc / total_n,
+        total_ce / total_n,
+        torch.cat(probs_list)
     )
 
-    return avg_acc, avg_ce
+def test(model, device, loader):
 
+    joint_acc, joint_ce, joint_probs = test_unit(model, device, loader)
+    vis_acc, vis_ce, vis_probs = test_unit(model, device, loader, 'visual')
+    aud_acc, aud_ce, aud_probs = test_unit(model, device, loader, 'audio')
 
-def test(model, device, test_loader):
-    acc, ce = test_unit(model, device, test_loader)
-    visual_acc, visual_ce = test_unit(model, device, test_loader, 'visual')
-    audio_acc, audio_ce = test_unit(model, device, test_loader, 'audio')
-    return acc, ce, visual_acc, visual_ce, audio_acc, audio_ce
+    return {
+        "joint_acc": joint_acc,
+        "joint_ce": joint_ce,
+        "joint_probs": joint_probs,
 
+        "vis_acc": vis_acc,
+        "vis_ce": vis_ce,
+        "vis_probs": vis_probs,
+
+        "aud_acc": aud_acc,
+        "aud_ce": aud_ce,
+        "aud_probs": aud_probs,
+    }
 
 def extract_representations(model, loader, device):
     model.eval()
