@@ -344,13 +344,11 @@ def load_fsdd():
     train_set, test_set = fsdd.train_test_split(test_size=0.2)
     return train_set, test_set
 
-
-def prepare_dataset(args):
-    train_kwargs = {'batch_size': args.batch_size}
-    test_kwargs = {'batch_size': args.test_batch_size}
+def prepare_dataset(args, cutoff_sum):
+    train_kwargs = {'batch_size': args.batch_size, 'shuffle': True}
+    test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': False}
     cuda_kwargs = {'num_workers': 0,
                    'pin_memory': True,
-                   'shuffle': False,
                    'drop_last': False}
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
@@ -363,8 +361,8 @@ def prepare_dataset(args):
     a_train, a_test = load_fsdd()
 
     # Create a multimodal dataset instance and its DataLoader
-    AV_trainset = AV_dataset_sum(v_train, a_train)
-    AV_testset = AV_dataset_sum(v_test, a_test)
+    AV_trainset = AV_dataset_sum(v_train, a_train, cutoff_sum)
+    AV_testset = AV_dataset_sum(v_test, a_test, cutoff_sum)
     AV_train = DataLoader(AV_trainset, **train_kwargs)
     AV_test = DataLoader(AV_testset, **test_kwargs)
 
@@ -378,7 +376,6 @@ def prepare_dataset(args):
     #     display(imgs)
 
     return AV_train, AV_test
-
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
