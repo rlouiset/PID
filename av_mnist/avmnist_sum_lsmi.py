@@ -10,7 +10,6 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from model import CNN_sum
 from dataset import AV_dataset_sum
-from utils_ours import return_redundancy_test_performances, compute_PID_categorical
 
 import torch
 import torch.nn.functional as F
