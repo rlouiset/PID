@@ -102,7 +102,7 @@ def load_fsdd():
 
         pad_or_crop,
 
-        augment,
+        # augment,
 
         normalize_spec,
     ])
