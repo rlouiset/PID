@@ -651,7 +651,6 @@ def mnist(args):
     ccs = compute_ccs_and_selection(
         ce_list, same_sign, log_py
     )
-    print(ccs[:5])
 
     redundancy_pointwise_ce = ccs.numpy()
     redundancy_ce = ccs.mean().item()
@@ -750,14 +749,15 @@ def mnist(args):
     redundancy_combinations = []
     unicity_0_combinations = []
     unicity_1_combinations = []
-    for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1, ccs_i in zip(test_img_labels, test_audio_labels, pid, ce_list[0], ce_list[1], ccs):
+    for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1, ccs_i, log_py_i in zip(test_img_labels, test_audio_labels, pid, ce_list[0], ce_list[1], ccs, log_py):
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
                 print(img_label)
                 print(aud_label)
-                print(ce_list_0)
-                print(ce_list_1)
-                print(ccs_i)
+                print("ce0: ", ce_list_0)
+                print("ce1: ", ce_list_1)
+                print("ccs: ", ccs_i)
+                print("log_py: ", log_py)
                 print(pointwise_pid)
                 print('---')
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
