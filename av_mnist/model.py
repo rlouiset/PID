@@ -147,7 +147,7 @@ class CNN(nn.Module):
 
 class CNN_sum(nn.Module):
 
-    def __init__(self, num_classes=10, emb_dim=128):
+    def __init__(self, num_classes=2, emb_dim=128):
         super(CNN_sum, self).__init__()
 
         # -------- Image branch (MNIST) --------
@@ -197,11 +197,15 @@ class CNN_sum(nn.Module):
         self.audio_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
             nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
             nn.Linear(128, 2)
         )
 
         self.visual_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
             nn.ReLU(),
             nn.Linear(128, 2)
         )
@@ -233,10 +237,10 @@ class CNN_sum(nn.Module):
             img_digit = self.visual_digit_classifier(img)
             aud_digit = self.audio_digit_classifier(aud)
 
-            img = self.visual_classifier(img)
-            aud = self.audio_classifier(aud)
+            img_label = self.visual_classifier(img)
+            aud_label = self.audio_classifier(aud)
 
-            return F.log_softmax(x, dim=1), F.log_softmax(img, dim=1), F.log_softmax(aud, dim=1), F.log_softmax(img_digit, dim=1), F.log_softmax(aud_digit, dim=1)
+            return F.log_softmax(x, dim=1), F.log_softmax(img_label, dim=1), F.log_softmax(aud_label, dim=1), F.log_softmax(img_digit, dim=1), F.log_softmax(aud_digit, dim=1)
 
         if unimodal is None:
             # Fusion
