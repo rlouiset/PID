@@ -771,6 +771,9 @@ def mnist(args):
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     # print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
 
+    print(test_img_labels[:10])
+    print(test_audio_labels[:10])
+
     # =======================
     # 9. Comparison with POINTWISE Human interpretation
     # =======================
@@ -784,18 +787,18 @@ def mnist(args):
         print("---")
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
-                print(img_label)
+                """print(img_label)
                 print(aud_label)
                 print(ce_list)
                 print(pointwise_pid)
-                print('---')
+                print('---')"""
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label < cutoff_sum+1 and aud_label > cutoff_sum:
-                print(img_label)
+                """print(img_label)
                 print(aud_label)
                 print(ce_list)
                 print(pointwise_pid)
-                print('---')
+                print('---')"""
                 unicity_1_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label > cutoff_sum and aud_label < cutoff_sum+1:
                 unicity_0_combinations.append(torch.tensor(pointwise_pid)[None, :])
