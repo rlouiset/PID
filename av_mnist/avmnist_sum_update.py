@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from model import CNN_sum
 from dataset import AV_dataset_sum
-from utils import pad_or_crop, TARGET_FRAMES, softmax, traditional_cross_entropy_from_probs
+from utils import TARGET_FRAMES, softmax, traditional_cross_entropy_from_probs
 from utils_ours import return_redundancy_test_performances
 
 import torch
@@ -50,6 +50,38 @@ def display(X):
     plt.show()
 
 
+def pad_or_crop(spec):
+    n_mels, T = spec.shape
+
+    if T > TARGET_FRAMES:
+        # random crop instead of left crop
+        start = np.random.randint(0, T - TARGET_FRAMES + 1)
+        spec = spec[:, start:start + TARGET_FRAMES]
+
+    elif T < TARGET_FRAMES:
+        pad = TARGET_FRAMES - T
+        left = pad // 2
+        right = pad - left
+        spec = F.pad(spec, (left, right))
+
+    return spec
+
+def normalize_spec(spec):
+    mean = spec.mean()
+    std = spec.std() + 1e-6
+    return (spec - mean) / std
+
+def add_noise(spec, noise_level=0.02):
+    noise = torch.randn_like(spec) * noise_level
+    return spec + noise
+
+
+def augment(spec):
+    if np.random.rand() < 0.5:
+        spec = add_noise(spec)
+
+    return spec
+
 def load_fsdd():
     from torchfsdd import TorchFSDDGenerator, TrimSilence
     from torchaudio.transforms import MFCC
@@ -68,17 +100,21 @@ def load_fsdd():
 
         AmplitudeToDB(),
 
-        pad_or_crop
+        pad_or_crop,
+
+        augment,
+
+        normalize_spec,
     ])
 
     # Initialize a generator for a local version of FSDD
-    fsdd = TorchFSDDGenerator(version='local', path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10', transforms=transforms,
-                              load_all=True) #  '/Users/robinlouiset/Documents/torch-fsdd/lib/test/data/v1.0.10'
+    fsdd = TorchFSDDGenerator(version='local', path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
+                              transforms=transforms,
+                              load_all=True)  # '/Users/robinlouiset/Documents/torch-fsdd/lib/test/data/v1.0.10'
 
     # Create two Torch datasets for a train-test split from the generator
     train_set, test_set = fsdd.train_test_split(test_size=0.1)
     return train_set, test_set
-
 
 def prepare_dataset(args, cutoff_sum):
     train_kwargs = {'batch_size': args.batch_size, 'shuffle': True}
