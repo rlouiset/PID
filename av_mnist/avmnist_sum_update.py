@@ -697,8 +697,6 @@ def mnist(args):
         "modality1": test_aud.float()
     }
 
-    print(y_test[:20])
-
     """y_pred_dict = return_redundancy_test_performances(
         X_train_dict,
         X_train_dict,
@@ -771,9 +769,6 @@ def mnist(args):
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     # print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
 
-    print(log_py[:20])
-    print(debug)
-
     # =======================
     # 9. Comparison with POINTWISE Human interpretation
     # =======================
@@ -781,13 +776,14 @@ def mnist(args):
     redundancy_combinations = []
     unicity_0_combinations = []
     unicity_1_combinations = []
-    for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1 in zip(test_img_labels, test_audio_labels, pid, ce_list[0], ce_list[1]):
+    for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1, ccs_i in zip(test_img_labels, test_audio_labels, pid, ce_list[0], ce_list[1], ccs):
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
                 print(img_label)
                 print(aud_label)
                 print(ce_list_0)
                 print(ce_list_1)
+                print(ccs)
                 print(pointwise_pid)
                 print('---')
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
@@ -799,11 +795,6 @@ def mnist(args):
                 synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
         else:
             synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
-
-    print(len(synergy_combinations))
-    print(len(redundancy_combinations))
-    print(len(unicity_0_combinations))
-    print(len(unicity_1_combinations))
 
     print(debug)
 
