@@ -492,31 +492,57 @@ def extract_representations(model, loader, device):
 
     return visual_repr, audio_repr, labels, img_labels, audio_labels
 
-
 def mnist(args):
-    AV_train, AV_test = prepare_dataset(args)
 
-    Ls = np.zeros(args.epoch)
-    acc, V_acc, A_acc = np.copy(Ls), np.copy(Ls), np.copy(Ls)
-    ce, V_ce, A_ce = np.copy(Ls), np.copy(Ls), np.copy(Ls)
+    # =======================
+    # 1. DATA
+    # =======================
+    cutoff_sum = 6
+    AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
+    # =======================
+    # 2. MODEL
+    # =======================
     model = CNN_sum(num_classes=2).to(device)
     print(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+
+    # =======================
+    # 3. TRAINING LOOP
+    # =======================
     for epoch in range(1, args.epoch + 1):
-        acc[epoch - 1], ce[epoch - 1], V_acc[epoch - 1], V_ce[epoch - 1], A_acc[epoch - 1], A_ce[epoch - 1] = test(
-            model, device, AV_test)
-        Ls[epoch - 1] = train(args, model, device, AV_train, optimizer, epoch)
 
-    vis(args, Ls, acc, V_acc, A_acc)
+        print(f"\n===== Epoch {epoch} =====")
 
-    train_vis, train_aud, y_train, img_labels, audio_labels = extract_representations(model, AV_train, device)
-    test_vis, test_aud, y_test, img_labels, audio_labels = extract_representations(model, AV_test, device)
+        train(args, model, device, AV_train, optimizer, epoch)
 
-    # -------------------------
-    # Save .pt for LSMI
-    # -------------------------
+        test_metrics = test(model, device, AV_test)
+
+        print(
+            f"Joint CE: {test_metrics['joint_ce']:.4f} | "
+            f"Visual CE: {test_metrics['vis_ce']:.4f} | "
+            f"Audio CE: {test_metrics['aud_ce']:.4f}"
+        )
+
+        print(
+            f"Joint Acc: {test_metrics['joint_acc']:.4f} | "
+            f"Visual Acc: {test_metrics['vis_acc']:.4f} | "
+            f"Audio Acc: {test_metrics['aud_acc']:.4f}"
+        )
+
+    # =======================
+    # 4. EXTRACT REPRESENTATIONS (SHARED!)
+    # =======================
+    train_vis, train_aud, y_train, train_img_labels, train_audio_labels = \
+        extract_representations(model, AV_train, device)
+
+    test_vis, test_aud, y_test, test_img_labels, test_audio_labels = \
+        extract_representations(model, AV_test, device)
+
+    # =======================
+    # 5. SAVE FEATURES FOR LSMI
+    # =======================
     lsmi_data = {
         "train_modal_1_features": train_vis.float(),
         "train_modal_2_features": train_aud.float(),
@@ -527,16 +553,16 @@ def mnist(args):
     }
 
     torch.save(lsmi_data, "lsmi.pt")
-    print(f"[✓] Saved LSMI data to lsmi.pt")
+    print("[✓] Saved LSMI data to lsmi.pt")
 
-    # -------------------------
-    # Fake cfg replacement
-    # -------------------------
+    # =======================
+    # 6. LSMI CONFIG
+    # =======================
     class CFG:
         pass
 
     cfg = CFG()
-    cfg.device = "cuda"
+    cfg.device = device
     cfg.batch_size = 512
     cfg.num_workers = 0
     cfg.embed_size = 128
@@ -549,121 +575,112 @@ def mnist(args):
 
     setup_seed(args.seed)
 
-    # -------------------------
-    # Load data
-    # -------------------------
+    # =======================
+    # 7. LOAD SAME FEATURES
+    # =======================
     train_loader, val_loader = get_loader(cfg, "lsmi.pt")
 
-    # -------------------------
-    # Train estimators
-    # -------------------------
+    # =======================
+    # 8. TRAIN LSMI ESTIMATORS
+    # =======================
     discriminator = obtain_discriminator(cfg, train_loader)
     entropy_estimator = obtain_entropy_estimator(cfg, train_loader)
 
-    # -------------------------
-    # LSMI (PID)
-    # -------------------------
-    print("\nTrain PID:")
+    # =======================
+    # 9. LSMI PID
+    # =======================
+    print("\n=== LSMI TRAIN PID ===")
     LSMI_estimation(train_loader, discriminator, entropy_estimator, cfg)
 
-    print("\nValidation PID:")
+    print("\n=== LSMI TEST PID ===")
     r, u1, u2, s = LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
 
-    # stack PID atoms in the same order as weights
-    list_of_pointwise_pid = np.stack([u1.detach().cpu().numpy(),
-                                      u2.detach().cpu().numpy(),
-                                      r.detach().cpu().numpy(),
-                                      s.detach().cpu().numpy()], axis=1)  # shape (N, 4)
+    # =======================
+    # 10. STACK POINTWISE PID
+    # =======================
+    pid_lsmi = np.stack([
+        u1.detach().cpu().numpy(),
+        u2.detach().cpu().numpy(),
+        r.detach().cpu().numpy(),
+        s.detach().cpu().numpy()
+    ], axis=1)
 
-    # RUS adjustement
-    r, u1, u2, s = RUS_adjustment([torch.tensor(r), torch.tensor(u1), torch.tensor(u2), torch.tensor(s)])
-    r, u1, u2, s = (r.detach().cpu().numpy(), u1.detach().cpu().numpy(),
-                    u2.detach().cpu().numpy(), s.detach().cpu().numpy())
+    # =======================
+    # 11. RUS ADJUSTMENT
+    # =======================
+    r, u1, u2, s = RUS_adjustment([r, u1, u2, s])
 
-    print("after adjustement")
-    print("r: ", np.mean(r))
-    print("u1: ", np.mean(u1))
-    print("u2: ", np.mean(u2))
-    print("s: ", np.mean(s))
+    r = r.detach().cpu().numpy()
+    u1 = u1.detach().cpu().numpy()
+    u2 = u2.detach().cpu().numpy()
+    s = s.detach().cpu().numpy()
 
-    # Subgroups
-    synergy_combinations = []
-    redundancy_combinations = []
-    unicity_0_combinations = []
-    unicity_1_combinations = []
-    for img_label, aud_label, pointwise_pids in zip(img_labels, audio_labels, list_of_pointwise_pid):
-        if img_label + aud_label > 7:
-            if img_label > 7 and aud_label > 7:
-                redundancy_combinations.append(torch.tensor(pointwise_pids)[None, :])
-            elif img_label < 8 and aud_label > 7:
-                unicity_1_combinations.append(torch.tensor(pointwise_pids)[None, :])
-            elif img_label > 7 and aud_label < 8:
-                unicity_0_combinations.append(torch.tensor(pointwise_pids)[None, :])
+    print("\n=== AFTER RUS ADJUSTMENT ===")
+    print("R:", np.mean(r))
+    print("U1:", np.mean(u1))
+    print("U2:", np.mean(u2))
+    print("S:", np.mean(s))
+
+    # =======================
+    # 12. SUBGROUP ANALYSIS (ALIGNED WITH YOUR FIRST CODE)
+    # =======================
+    synergy, redundancy, u0_list, u1_list = [], [], [], []
+
+    for img_label, aud_label, pid_val in zip(
+        test_img_labels, test_audio_labels, pid_lsmi
+    ):
+
+        if img_label + aud_label > cutoff_sum:
+
+            if img_label > cutoff_sum and aud_label > cutoff_sum:
+                redundancy.append(torch.tensor(pid_val)[None, :])
+
+            elif img_label <= cutoff_sum and aud_label > cutoff_sum:
+                u1_list.append(torch.tensor(pid_val)[None, :])
+
+            elif img_label > cutoff_sum and aud_label <= cutoff_sum:
+                u0_list.append(torch.tensor(pid_val)[None, :])
+
             else:
-                synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+                synergy.append(torch.tensor(pid_val)[None, :])
         else:
-            synergy_combinations.append(torch.tensor(pointwise_pids)[None, :])
+            synergy.append(torch.tensor(pid_val)[None, :])
 
-    print(torch.cat(synergy_combinations).shape)
+    print("\n=== SUBGROUP PID ===")
+    print("Synergy:", torch.mean(torch.cat(synergy), dim=0))
+    print("Redundancy:", torch.mean(torch.cat(redundancy), dim=0))
+    print("U0:", torch.mean(torch.cat(u0_list), dim=0))
+    print("U1:", torch.mean(torch.cat(u1_list), dim=0))
 
-    print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
-    print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
-    print("Unicity 0 Combinations:", torch.mean(torch.cat(unicity_0_combinations), dim=0))
-    print("Unicity 1 Combinations:", torch.mean(torch.cat(unicity_1_combinations), dim=0))
+    # =======================
+    # 13. COSINE SIMILARITY (SAME AS YOUR METHOD)
+    # =======================
+    list_pid = [
+        torch.cat(redundancy),
+        torch.cat(u0_list),
+        torch.cat(u1_list),
+        torch.cat(synergy)
+    ]
 
-    # POINTWISE COSINE SIMILARITY
-    list_of_pointwise_pids = [torch.cat(redundancy_combinations), torch.cat(unicity_0_combinations),
-                              torch.cat(unicity_1_combinations), torch.cat(synergy_combinations)]
-    list_pointwise_labels = [torch.cat([torch.tensor([0, 0, 1, 0])[None, :]]*len(list_of_pointwise_pids[0]), dim=0),
-                             torch.cat([torch.tensor([1, 0, 0, 0])[None, :]] * len(list_of_pointwise_pids[1]), dim=0),
-                             torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_of_pointwise_pids[2]), dim=0),
-                             torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_of_pointwise_pids[3]), dim=0)]
+    list_labels = [
+        torch.cat([torch.tensor([0, 0, 1, 0])[None, :]] * len(list_pid[0])),
+        torch.cat([torch.tensor([1, 0, 0, 0])[None, :]] * len(list_pid[1])),
+        torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_pid[2])),
+        torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_pid[3])),
+    ]
 
-    pid = torch.cat(list_of_pointwise_pids, dim=0)
-    pid_labels = torch.cat(list_pointwise_labels, dim=0)
+    pid = torch.cat(list_pid).numpy()
+    pid_labels = torch.cat(list_labels).numpy()
 
     pid = np.maximum(pid, 0)
-    row_sums = pid.sum(axis=1, keepdims=True)
+    pid /= pid.sum(axis=1, keepdims=True) + 1e-12
 
-    # Replace zero rows with uniform distribution
-    zero_rows = row_sums.squeeze() == 0
-    pid[zero_rows] = 1.0 / pid.shape[1]
-    # Now renormalize safely
-    pid_norm = pid / pid.sum(axis=1, keepdims=True)
+    pid_l2 = pid / np.linalg.norm(pid, axis=1, keepdims=True)
+    labels_l2 = pid_labels / np.linalg.norm(pid_labels, axis=1, keepdims=True)
 
-    # L2 normalize both vectors
-    pid_l2 = pid_norm / np.linalg.norm(pid_norm, axis=1, keepdims=True)
-    pid_labels_l2 = pid_labels / np.linalg.norm(pid_labels, axis=1, keepdims=True)
+    sim = np.sum(pid_l2 * labels_l2, axis=1)
 
-    print(pid_l2.shape)
-    print(pid_labels_l2.shape)
-
-    sim_pointwise = torch.sum(pid_l2 * pid_labels_l2, dim=1)
-
-    print("Mean true per-sample cosine similarity:", sim_pointwise.mean())
-
-    """pid_names = ["R", "U0", "U1", "S"]
-    for pid, pid_labels, pid_name in zip(list_of_pointwise_pids, list_pointwise_labels, pid_names):
-        pid = np.maximum(pid, 0)
-        row_sums = pid.sum(axis=1, keepdims=True)
-
-        # Replace zero rows with uniform distribution
-        zero_rows = row_sums.squeeze() == 0
-        pid[zero_rows] = 1.0 / pid.shape[1]
-        # Now renormalize safely
-        pid_norm = pid / pid.sum(axis=1, keepdims=True)
-
-        # L2 normalize both vectors
-        pid_l2 = pid_norm / np.linalg.norm(pid_norm, axis=1, keepdims=True)
-        pid_labels_l2 = pid_labels / np.linalg.norm(pid_labels, axis=1, keepdims=True)
-
-        print(pid_l2.shape)
-        print(pid_labels_l2.shape)
-
-        sim_pointwise = torch.sum(pid_l2 * pid_labels_l2, dim=1)
-
-        print("Mean true per-sample cosine similarity:", sim_pointwise.mean())"""
-
+    print("\nMean cosine similarity (LSMI):", sim.mean())
 
 if __name__ == '__main__':
     args = config().parse_args()
