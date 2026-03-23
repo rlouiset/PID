@@ -757,7 +757,7 @@ def mnist(args):
                 print("ce0: ", ce_list_0)
                 print("ce1: ", ce_list_1)
                 print("ccs: ", ccs_i)
-                print("log_py: ", log_py)
+                print("log_py: ", log_py_i)
                 print(pointwise_pid)
                 print('---')
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
