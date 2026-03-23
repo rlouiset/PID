@@ -508,7 +508,7 @@ def mnist(args):
     # =======================
     # 1. DATA
     # =======================
-    cutoff_sum = 6
+    cutoff_sum = 7
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     # =======================
@@ -541,6 +541,18 @@ def mnist(args):
             f"Visual Acc: {test_metrics['vis_acc']:.4f} | "
             f"Audio Acc: {test_metrics['aud_acc']:.4f}"
         )
+
+    # =======================
+    # SAVE MODEL
+    # =======================
+    save_path = "cnn_sum_model.pt"
+
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }, save_path)
+
+    print(f"[✓] Model saved to {save_path}")
 
     # =======================
     # 4. EXTRACT REPRESENTATIONS (SHARED!)
@@ -686,8 +698,8 @@ def mnist(args):
     pid = np.maximum(pid, 0)
     pid /= pid.sum(axis=1, keepdims=True) + 1e-12
 
-    pid_l2 = pid / np.linalg.norm(pid, axis=1, keepdims=True)
-    labels_l2 = pid_labels / np.linalg.norm(pid_labels, axis=1, keepdims=True)
+    pid_l2 = pid / (np.linalg.norm(pid, axis=1, keepdims=True) + 1e-6)
+    labels_l2 = pid_labels / (np.linalg.norm(pid_labels, axis=1, keepdims=True) + 1e-6)
 
     sim = np.sum(pid_l2 * labels_l2, axis=1)
 
