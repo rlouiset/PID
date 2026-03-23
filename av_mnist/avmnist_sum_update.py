@@ -286,8 +286,8 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         h_y = -log_py_i
 
         # ===== CLIPPING =====
-        """modality0_ce = min(modality0_ce, h_y)
-        modality1_ce = min(modality1_ce, h_y)"""
+        modality0_ce = min(modality0_ce, h_y)
+        modality1_ce = min(modality1_ce, h_y)
         redundancy_ce = min(redundancy_ce, h_y)
 
         redundancy_ce = max(redundancy_ce, joint_ce)
@@ -295,8 +295,8 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
 
-        """modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)"""
+        modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
@@ -375,11 +375,11 @@ def compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes):
 
         s = total - u0 - u1 - r_val
 
-        if s < 0:
+        """if s < 0:
             r_val -= s
             u0 = max(0, h_y - modality0_ce - r_val)
             u1 = max(0, h_y - modality1_ce - r_val)
-            s = 0
+            s = 0"""
 
         pid_list.append([u0, u1, r_val, s])
 
@@ -706,7 +706,7 @@ def mnist(args):
         "modality1": test_aud.float()
     }
 
-    """y_pred_dict = return_redundancy_test_performances(
+    y_pred_dict = return_redundancy_test_performances(
         X_train_dict,
         X_train_dict,
         X_test_dict,
@@ -729,7 +729,7 @@ def mnist(args):
 
     print("\n=== Learned redundancy performances ===")
     for k, v in results.items():
-        print(f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")"""
+        print(f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")
 
     # =======================
     # 7. BUILD METRICS DICT
@@ -748,14 +748,14 @@ def mnist(args):
 
         "true_labels": y_test,
 
-        #"source_redundancy_pointwise_ce": results["average"]["cross_entropy"],
-        #"source_redundancy_preds": y_pred_dict["average"]
+        "source_redundancy_pointwise_ce": results["average"]["cross_entropy"],
+        "source_redundancy_preds": y_pred_dict["average"]
     }
 
     # =======================
     # 8. GLOBAL PID
     # =======================
-    """print("\n=== GLOBAL PID (WITH SOURCE) ===")
+    print("\n=== GLOBAL PID (WITH SOURCE) ===")
 
     compute_PID_categorical_with_source_decomposition(
         joint_ce,
@@ -765,7 +765,7 @@ def mnist(args):
         results["average"]["cross_entropy"],
         num_classes=2,
         targets=y_test
-    )"""
+    )
 
     # =======================
     # 9. POINTWISE PID
@@ -788,14 +788,14 @@ def mnist(args):
     for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1, ccs_i, log_py_i in zip(test_img_labels, test_audio_labels, pid, ce_list[0], ce_list[1], ccs, log_py):
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
-                print(img_label)
+                """print(img_label)
                 print(aud_label)
                 print("ce0: ", ce_list_0)
                 print("ce1: ", ce_list_1)
                 print("ccs: ", ccs_i)
                 print("log_py: ", log_py_i)
                 print(pointwise_pid)
-                print('---')
+                print('---')"""
                 redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
             elif img_label < cutoff_sum+1 and aud_label > cutoff_sum:
                 unicity_1_combinations.append(torch.tensor(pointwise_pid)[None, :])
@@ -806,7 +806,7 @@ def mnist(args):
         else:
             synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
 
-    print(debug)
+    # print(debug)
 
     print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
     print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
