@@ -761,7 +761,7 @@ def mnist(args):
     print("U1:", torch.mean(torch.cat(u1_list), dim=0))
 
     # =======================
-    # 13. COSINE SIMILARITY (SAME AS YOUR METHOD)
+    # 13. COSINE SIMILARITY
     # =======================
     list_pid = [
         torch.cat(redundancy),
