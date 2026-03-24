@@ -71,14 +71,23 @@ def normalize_spec(spec):
     std = spec.std() + 1e-6
     return (spec - mean) / std
 
-def add_noise(spec, noise_level=0.02):
+def add_noise(spec, noise_level=0.05):
     noise = torch.randn_like(spec) * noise_level
     return spec + noise
 
+def freq_mask(spec, max_width=8):
+    Freq, _ = spec.shape
+    width = np.random.randint(0, max_width)
+    start = np.random.randint(0, max(1, Freq - width))
+    spec[start:start+width, :] = 0
+    return spec
 
 def augment(spec):
-    if np.random.rand() < 0.5:
+    if np.random.rand() < 0.8:
         spec = add_noise(spec)
+
+    if np.random.rand() < 0.5:
+        spec = freq_mask(spec)
 
     return spec
 
@@ -102,7 +111,7 @@ def load_fsdd():
 
         pad_or_crop,
 
-        # augment,
+        augment,
 
         normalize_spec,
     ])
@@ -785,7 +794,7 @@ def mnist(args):
     redundancy_combinations = []
     unicity_0_combinations = []
     unicity_1_combinations = []
-    for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1, ccs_i, log_py_i in zip(test_img_labels, test_audio_labels, pid, ce_list[0], ce_list[1], ccs, log_py):
+    for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1, ccs_i, log_py_i in zip(test_img_labels, test_audio_labels, pid, vis_probs, aud_probs, ccs, log_py):
         if img_label + aud_label > cutoff_sum:
             if img_label > cutoff_sum and aud_label > cutoff_sum:
                 print(img_label)
@@ -806,7 +815,7 @@ def mnist(args):
         else:
             synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
 
-    # print(debug)
+    print(debug)
 
     print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
     print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
