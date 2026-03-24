@@ -430,8 +430,8 @@ def compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes):
         h_y = -log_py_i
 
         # ===== CLIPPING =====
-        modality0_ce = min(modality0_ce, h_y)
-        modality1_ce = min(modality1_ce, h_y)
+        """modality0_ce = min(modality0_ce, h_y)
+        modality1_ce = min(modality1_ce, h_y)"""
         redundancy_ce = min(redundancy_ce, h_y)
         source_redundancy_ce = min(source_redundancy_ce, h_y)
 
@@ -441,8 +441,8 @@ def compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes):
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
 
-        modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)
+        """modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)"""
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
@@ -450,8 +450,8 @@ def compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes):
         # your design choice: strongest redundancy
         r_val = max(h_y - redundancy_ce, h_y - source_redundancy_ce)
 
-        u0 = max(0, h_y - modality0_ce - r_val)
-        u1 = max(0, h_y - modality1_ce - r_val)
+        u0 = h_y - modality0_ce - r_val
+        u1 = h_y - modality1_ce - r_val
 
         s = total - u0 - u1 - r_val
 
@@ -527,12 +527,12 @@ def compute_PID_categorical_with_source_decomposition(
     I_S = I - I_U0 - I_U1 - I_R
 
     # ===== 5. NON-NEGATIVITY =====
-    if I_S < 0:
+    """if I_S < 0:
         I_R -= I_S
         I_R_source -= I_S
         I_U0 = (H_Y - modality0_ce) - I_R
         I_U1 = (H_Y - modality1_ce) - I_R
-        I_S = 0
+        I_S = 0"""
 
     ratio_source = I_R_source / (I_R + 1e-10)
 
