@@ -198,11 +198,13 @@ class CNN_sum(nn.Module):
 
         self.audio_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
+            nn.ReLU(),
             nn.Linear(128, 2)
         )
 
         self.visual_classifier = nn.Sequential(
             nn.Linear(emb_dim, 128),
+            nn.ReLU(),
             nn.Linear(128, 2)
         )
 
