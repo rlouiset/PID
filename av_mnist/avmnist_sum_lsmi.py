@@ -286,7 +286,7 @@ def normalize_spec(spec):
     std = spec.std() + 1e-6
     return (spec - mean) / std
 
-def add_noise(spec, noise_level=0.05):
+def add_noise(spec, noise_level=0.025):
     noise = torch.randn_like(spec) * noise_level
     return spec + noise
 
@@ -301,11 +301,11 @@ def freq_mask(spec, max_width=8):
     return spec
 
 def augment(spec):
-    if np.random.rand() < 0.8:
+    if np.random.rand() < 0.75:
         spec = add_noise(spec)
 
-    if np.random.rand() < 0.5:
-        spec = freq_mask(spec)
+    #if np.random.rand() < 0.5:
+    #    spec = freq_mask(spec)
 
     return spec
 
