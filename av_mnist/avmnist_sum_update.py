@@ -400,11 +400,11 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
 
         s = total - u0 - u1 - r_val
 
-        if s < 0:
+        """if s < 0:
             r_val -= s
             u0 = h_y - modality0_ce - r_val
             u1 = h_y - modality1_ce - r_val
-            s = 0
+            s = 0"""
 
         pid_list.append([u0, u1, r_val, s])
 
@@ -508,8 +508,8 @@ def compute_PID_categorical_with_source_decomposition(
     source_redundancy_ce = min(source_redundancy_ce, H_Y)
 
     # ===== 3. YOUR STRUCTURAL CONSTRAINTS =====
-    # redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
-    # source_redundancy_ce = max(source_redundancy_ce, joint_ce, modality0_ce, modality1_ce)
+    redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
+    source_redundancy_ce = max(source_redundancy_ce, joint_ce, modality0_ce, modality1_ce)
 
     # keep only shared redundancy
     redundancy_ce = min(redundancy_ce, source_redundancy_ce)
