@@ -189,6 +189,8 @@ class CNN_sum(nn.Module):
             nn.AdaptiveAvgPool2d((4,4))
         )
 
+        self.dropout = nn.Dropout(p=0.1)
+
         self.audio_fc = nn.Linear(128 * 4 * 4, emb_dim)
 
         # -------- Fusion classifier --------
@@ -217,12 +219,12 @@ class CNN_sum(nn.Module):
         # Image embedding
         img = self.image_encoder(xA)
         img = torch.flatten(img, 1)
-        img = self.image_fc(img)
+        img = self.image_fc(self.dropout(img))
 
         # Audio embedding
         aud = self.audio_encoder(xB)
         aud = torch.flatten(aud, 1)
-        aud = self.audio_fc(aud)
+        aud = self.audio_fc(self.dropout(aud))
 
         if unimodal=="train":
             x = torch.cat((img, aud), dim=1)
