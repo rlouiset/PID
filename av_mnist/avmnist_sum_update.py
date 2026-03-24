@@ -286,8 +286,8 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         h_y = -log_py_i
 
         # ===== CLIPPING =====
-        modality0_ce = min(modality0_ce, h_y)
-        modality1_ce = min(modality1_ce, h_y)
+        """modality0_ce = min(modality0_ce, h_y)
+        modality1_ce = min(modality1_ce, h_y)"""
         redundancy_ce = min(redundancy_ce, h_y)
 
         redundancy_ce = max(redundancy_ce, joint_ce)
@@ -295,8 +295,8 @@ def compute_pointwise_pid_from_probs(dict_of_metrics, num_classes):
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
 
-        modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)
+        """modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)"""
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
@@ -806,7 +806,7 @@ def mnist(args):
         else:
             synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
 
-    print(debug)
+    # print(debug)
 
     print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
     print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
