@@ -514,7 +514,7 @@ def test_unit(model, device, loader, unimodal=None):
 
             # ===== FULL FORWARD =====
             if unimodal is None:
-                output, output_img, output_aud, output_digit_img, output_digit_aud = model.forward(imgs, audios)
+                output, output_img, output_aud, output_digit_img, output_digit_aud = model.forward(imgs, audios, unimodal="train")
                 logits = output
             else:
                 logits = model(imgs, audios, unimodal)
