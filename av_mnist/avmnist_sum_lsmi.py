@@ -30,6 +30,10 @@ import numpy as np
 from utils_lsmi import MargKernel, cls_network
 from utils_lsmi import get_loader, setup_seed
 
+from torchfsdd import TorchFSDDGenerator, TrimSilence
+from torchaudio.transforms import MFCC
+from torchvision.transforms import Compose, Resize
+
 
 def RUS_adjustment(rus):
     """
@@ -388,7 +392,6 @@ def get_image_transforms(train=True):
     return transforms.Compose(base)
 
 def load_fsdd():
-    from torchfsdd import TorchFSDDGenerator, TrimSilence
 
     train_transforms = get_audio_transforms(train=True)
     test_transforms = get_audio_transforms(train=False)
