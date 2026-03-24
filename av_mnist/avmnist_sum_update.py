@@ -89,12 +89,24 @@ def freq_mask(spec, max_width=8):
     spec[start:start+width, :] = 0
     return spec
 
+def time_mask(spec, max_width=10):
+    _, T = spec.shape
+
+    width = np.random.randint(0, max_width)
+    start = np.random.randint(0, max(1, T - width))
+
+    spec[:, start:start+width] = 0
+    return spec
+
 def augment(spec):
     if np.random.rand() < 0.8:
         spec = add_noise(spec)
 
     if np.random.rand() < 0.5:
         spec = freq_mask(spec)
+
+    if np.random.rand() < 0.5:
+        spec = time_mask(spec)
 
     return spec
 
@@ -180,7 +192,7 @@ def prepare_dataset(args, cutoff_sum):
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
 
-    # 🔑 separate transforms
+    # separate transforms
     v_train = datasets.MNIST(
         'data',
         train=True,
@@ -198,7 +210,7 @@ def prepare_dataset(args, cutoff_sum):
 
     AV_trainset = AV_dataset_sum(
         v_train, a_train, cutoff_sum,
-        samples_per_combination=20
+        samples_per_combination=30
     )
 
     AV_testset = AV_dataset_sum(
