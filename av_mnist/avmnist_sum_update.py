@@ -709,7 +709,7 @@ def mnist(args):
         )
         )"""
 
-    checkpoint = torch.load("cnn_sum7_model.pt", map_location=device)
+    checkpoint = torch.load("cnn_sum" + str(cutoff_sum) + "_model.pt", map_location=device)
 
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
