@@ -778,7 +778,7 @@ def mnist(args):
 
     print(f"\nCCS redundancy CE: {redundancy_ce:.4f}")
 
-    """# =======================
+    # =======================
     # 6. SOURCE REDUNDANCY (LEARNED)
     # =======================
     X_train_dict = {
@@ -814,7 +814,7 @@ def mnist(args):
 
     print("\n=== Learned redundancy performances ===")
     for k, v in results.items():
-        print(f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")"""
+        print(f"{k:10s} | acc = {v['accuracy']:.4f}, CE = {v['cross_entropy']:.4f}")
 
     # =======================
     # 7. BUILD METRICS DICT
@@ -833,14 +833,14 @@ def mnist(args):
 
         "true_labels": y_test,
 
-        #"source_redundancy_pointwise_ce": results["average"]["cross_entropy"],
-        #"source_redundancy_preds": y_pred_dict["average"]
+        "source_redundancy_pointwise_ce": results["average"]["cross_entropy"],
+        "source_redundancy_preds": y_pred_dict["average"]
     }
 
     # =======================
     # 8. GLOBAL PID
     # =======================
-    """print("\n=== GLOBAL PID (WITH SOURCE) ===")
+    print("\n=== GLOBAL PID (WITH SOURCE) ===")
 
     compute_PID_categorical_with_source_decomposition(
         joint_ce,
@@ -850,7 +850,7 @@ def mnist(args):
         results["average"]["cross_entropy"],
         num_classes=2,
         targets=y_test
-    )"""
+    )
 
     # =======================
     # 9. POINTWISE PID
@@ -858,10 +858,10 @@ def mnist(args):
     print("\n=== POINTWISE PID ===")
 
     pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes=2)
-    # pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2)
+    pid_source = compute_pointwise_pid_with_source_from_probs(dict_of_metrics, num_classes=2)
 
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
-    # print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
+    print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
 
     # =======================
     # 9. Comparison with POINTWISE Human interpretation
