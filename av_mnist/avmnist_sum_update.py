@@ -616,23 +616,6 @@ def compute_log_py(targets, num_classes):
 def logp(p):
     return torch.log(torch.clamp(p, 1e-12, 1.0))
 
-def normalize_pid(pid):
-    """
-    Ensure valid PID:
-        - non-negative
-        - sums to 1
-    """
-    pid = np.maximum(pid, 0)
-
-    row_sums = pid.sum(axis=1, keepdims=True)
-    zero_rows = row_sums.squeeze() == 0
-
-    pid[zero_rows] = 1.0 / pid.shape[1]
-    pid /= pid.sum(axis=1, keepdims=True)
-
-    return pid
-
-
 def cosine_similarity(a, b):
     """
     Row-wise cosine similarity
@@ -690,7 +673,7 @@ def extract_representations(model, loader, device):
     return visual_repr, audio_repr, labels, img_labels, audio_labels
 
 def mnist(args):
-    cutoff_sum = 6
+    cutoff_sum = 7
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     model = CNN_sum(num_classes=2).to(device)
@@ -921,11 +904,15 @@ def mnist(args):
     pid = torch.cat(list_of_pointwise_pids, dim=0).float()
     pid_labels = torch.cat(list_pointwise_labels, dim=0).float()
 
-    pid_norm = normalize_pid(pid)
-    pid_labels_norm = normalize_pid(pid_labels)
+    pid = np.maximum(pid, 0)
+    pid /= pid.sum(axis=1, keepdims=True) + 1e-12
 
-    sim = cosine_similarity(pid_norm.numpy(), pid_labels_norm.numpy())
-    print("Mean true per-sample cosine similarity without source:", sim.mean())
+    pid_l2 = pid / (np.linalg.norm(pid, axis=1, keepdims=True) + 1e-6)
+    labels_l2 = pid_labels / (np.linalg.norm(pid_labels, axis=1, keepdims=True) + 1e-6)
+
+    sim = np.sum(pid_l2 * labels_l2, axis=1)
+
+    print("\nMean cosine similarity (LSMI):", sim.mean())
 
 if __name__ == '__main__':
     args = config().parse_args()
