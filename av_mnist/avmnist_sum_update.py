@@ -33,8 +33,8 @@ def config():
     parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
     parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
     parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=75, metavar='N', help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
+    parser.add_argument('--epoch', type=int, default=50, metavar='N', help='number of epochs to train')
+    parser.add_argument('--lr', type=float, default=0.0001, metavar='LR', help='learning rate')
     parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
     parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
     parser.add_argument('--log-interval', type=int, default=30, metavar='N',
@@ -161,8 +161,8 @@ def load_fsdd():
         load_all=True
     )
 
-    train_set, _ = fsdd_train.train_test_split(test_size=0.2)
-    _, test_set = fsdd_test.train_test_split(test_size=0.2)
+    train_set, _ = fsdd_train.train_test_split(test_size=0.15)
+    _, test_set = fsdd_test.train_test_split(test_size=0.15)
 
     return train_set, test_set
 
@@ -917,7 +917,22 @@ def mnist(args):
 
 if __name__ == '__main__':
     args = config().parse_args()
-    torch.manual_seed(args.seed)
+
+    import random
+    import numpy as np
+    import torch
+
+
+    def set_seed(seed):
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+
+        # Ensures deterministic behavior (important for reproducibility)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
     mnist(args)
 
