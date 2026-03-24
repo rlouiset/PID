@@ -281,44 +281,6 @@ def config():
     print(parser.parse_args(), '\n')
     return parser
 
-
-def vis(args, Ls, acc, V_acc, A_acc):
-    L = args.depth + 1
-    filename = "{}_L{}_Lf{}_lr{}_seed{}".format(args.model, L, args.fuse_depth, args.lr, args.seed)
-
-    import pandas as pd
-    df = pd.DataFrame({'Ls': Ls,
-                       'Eg': acc,
-                       'Eg_A': V_acc,
-                       'Eg_B': A_acc})
-    df.to_csv("{}.csv".format(filename))
-
-    import matplotlib
-    import matplotlib.pyplot as plt
-    plt.rcParams['axes.spines.right'] = False
-    plt.rcParams['axes.spines.top'] = False
-    plt.figure(figsize=(4, 3))
-    plt.plot(Ls / Ls[0], c='k', lw=1.5, label="Loss")
-    plt.plot(A_acc, c='fuchsia', lw=1.5, label="Audio acc")
-    plt.plot(V_acc, c='b', lw=1.5, label="Visual acc")
-    plt.plot(acc, 'k--', lw=1.5, label="AV acc")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss & Accuracy")
-    plt.xlim((0, args.epoch - 1))
-    plt.legend()
-    plt.tight_layout(pad=0.5)
-    plt.savefig("{}.svg".format(filename))
-    # plt.show()
-
-
-def display(X):
-    import numpy as np
-    import matplotlib
-    import matplotlib.pyplot as plt
-    img = X[0, 0, :, :].cpu().detach().numpy()
-    plt.imshow(img, cmap='gray')
-    plt.show()
-
 def normalize_spec(spec):
     mean = spec.mean()
     std = spec.std() + 1e-6
@@ -447,7 +409,7 @@ def prepare_dataset(args, cutoff_sum):
 
     AV_trainset = AV_dataset_sum(
         v_train, a_train, cutoff_sum,
-        samples_per_combination=100
+        samples_per_combination=20
     )
 
     AV_testset = AV_dataset_sum(
