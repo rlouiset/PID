@@ -901,8 +901,8 @@ def mnist(args):
                              torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_of_pointwise_pids[2]), dim=0),
                              torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_of_pointwise_pids[3]), dim=0)]
 
-    pid = torch.cat(list_of_pointwise_pids, dim=0).float()
-    pid_labels = torch.cat(list_pointwise_labels, dim=0).float()
+    pid = torch.cat(list_of_pointwise_pids, dim=0).float().numpy()
+    pid_labels = torch.cat(list_pointwise_labels, dim=0).float().numpy()
 
     pid = np.maximum(pid, 0)
     pid /= pid.sum(axis=1, keepdims=True) + 1e-12
