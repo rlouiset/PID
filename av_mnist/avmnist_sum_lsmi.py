@@ -325,9 +325,12 @@ def add_noise(spec, noise_level=0.05):
     return spec + noise
 
 def freq_mask(spec, max_width=8):
+    spec = spec.clone()
+
     Freq, _ = spec.shape
     width = np.random.randint(0, max_width)
     start = np.random.randint(0, max(1, Freq - width))
+
     spec[start:start+width, :] = 0
     return spec
 
@@ -340,13 +343,8 @@ def augment(spec):
 
     return spec
 
-def load_fsdd():
-    from torchfsdd import TorchFSDDGenerator, TrimSilence
-    from torchaudio.transforms import MFCC
-    from torchvision.transforms import Compose, Resize
-
-    # Specify transformations to be applied to the raw audio
-    transforms = Compose([
+def get_audio_transforms(train=True):
+    base = [
         TrimSilence(threshold=1e-6),
 
         MelSpectrogram(
@@ -359,51 +357,103 @@ def load_fsdd():
         AmplitudeToDB(),
 
         pad_or_crop,
+    ]
 
-        augment,
+    if train:
+        base += [
+            augment,
+        ]
 
-        normalize_spec,
-    ])
+    base += [normalize_spec]
 
-    # Initialize a generator for a local version of FSDD
-    fsdd = TorchFSDDGenerator(version='local', path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
-                              transforms=transforms,
-                              load_all=True)  # '/Users/robinlouiset/Documents/torch-fsdd/lib/test/data/v1.0.10'
+    return Compose(base)
 
-    # Create two Torch datasets for a train-test split from the generator
-    train_set, test_set = fsdd.train_test_split(test_size=0.1)
+def get_image_transforms(train=True):
+    base = []
+
+    if train:
+        base += [
+            transforms.RandomAffine(
+                degrees=10,
+                translate=(0.1, 0.1),
+                scale=(0.9, 1.1)
+            ),
+        ]
+
+    base += [
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ]
+
+    return transforms.Compose(base)
+
+def load_fsdd():
+    from torchfsdd import TorchFSDDGenerator, TrimSilence
+
+    train_transforms = get_audio_transforms(train=True)
+    test_transforms = get_audio_transforms(train=False)
+
+    fsdd_train = TorchFSDDGenerator(
+        version='local',
+        path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
+        transforms=train_transforms,
+        load_all=True
+    )
+
+    fsdd_test = TorchFSDDGenerator(
+        version='local',
+        path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
+        transforms=test_transforms,
+        load_all=True
+    )
+
+    train_set, _ = fsdd_train.train_test_split(test_size=0.2)
+    _, test_set = fsdd_test.train_test_split(test_size=0.2)
+
     return train_set, test_set
 
 def prepare_dataset(args, cutoff_sum):
+
     train_kwargs = {'batch_size': args.batch_size, 'shuffle': True}
     test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': False}
-    cuda_kwargs = {'num_workers': 0,
-                   'pin_memory': True,
-                   'drop_last': False}
+
+    cuda_kwargs = {
+        'num_workers': 0,
+        'pin_memory': True,
+        'drop_last': False
+    }
+
     train_kwargs.update(cuda_kwargs)
     test_kwargs.update(cuda_kwargs)
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
-    v_train = datasets.MNIST('data', train=True, download=True, transform=transform)
-    v_test = datasets.MNIST('data', train=False, transform=transform)
+
+    # 🔑 separate transforms
+    v_train = datasets.MNIST(
+        'data',
+        train=True,
+        download=True,
+        transform=get_image_transforms(train=True)
+    )
+
+    v_test = datasets.MNIST(
+        'data',
+        train=False,
+        transform=get_image_transforms(train=False)
+    )
+
     a_train, a_test = load_fsdd()
 
-    # Create a multimodal dataset instance and its DataLoader
-    AV_trainset = AV_dataset_sum(v_train, a_train, cutoff_sum)
-    AV_testset = AV_dataset_sum(v_test, a_test, cutoff_sum)
+    AV_trainset = AV_dataset_sum(
+        v_train, a_train, cutoff_sum,
+        samples_per_combination=100
+    )
+
+    AV_testset = AV_dataset_sum(
+        v_test, a_test, cutoff_sum,
+        samples_per_combination=10
+    )
+
     AV_train = DataLoader(AV_trainset, **train_kwargs)
     AV_test = DataLoader(AV_testset, **test_kwargs)
-
-    # Iterate over the DataLoader to get batches of paired data
-    # for batch in AV_train:
-    #     imgs, audios, labels = batch
-    #     # Do whatever you need with the paired data
-    #     print("MNIST images:", imgs.shape)
-    #     print("Spoken digit audios:", audios.shape)
-    #     print("Labels:", labels)
-    #     display(imgs)
 
     return AV_train, AV_test
 
@@ -415,9 +465,6 @@ def train(args, model, device, train_loader, optimizer, epoch):
         optimizer.zero_grad()
         output, output_img, output_aud, output_digit_img, output_digit_aud = model.forward(imgs, audios,
                                                                                            unimodal="train")
-        # loss = F.cross_entropy(output, labels)
-        # loss += F.cross_entropy(output_img, labels)
-        # loss += F.cross_entropy(output_aud, labels)
         loss = F.nll_loss(output_digit_img, labels_img)
         loss += F.nll_loss(output_digit_aud, labels_aud)
 
@@ -440,7 +487,6 @@ def train(args, model, device, train_loader, optimizer, epoch):
         optimizer.step()
     return Ls
 
-
 def test_unit(model, device, loader, unimodal=None):
 
     model.eval()
@@ -449,22 +495,32 @@ def test_unit(model, device, loader, unimodal=None):
     total_ce = 0
     total_n = 0
 
+    total_img_acc = 0
+    total_aud_acc = 0
+
     probs_list = []
 
     with torch.no_grad():
-        for imgs, audios, labels, _, _ in loader:
+        for imgs, audios, labels, labels_img, labels_aud in loader:
 
             imgs = imgs.to(device)
             audios = audios.to(device)
             labels = labels.to(device)
+            labels_img = labels_img.to(device)
+            labels_aud = labels_aud.to(device)
 
+            # ===== FULL FORWARD =====
             if unimodal is None:
-                logits = model(imgs, audios)
+                output, output_img, output_aud, output_digit_img, output_digit_aud = model.forward(imgs, audios)
+                logits = output
             else:
                 logits = model(imgs, audios, unimodal)
 
-            probs = torch.exp(logits)
+                # no digit heads in unimodal mode
+                output_digit_img = None
+                output_digit_aud = None
 
+            probs = torch.exp(logits)
             probs_list.append(probs.cpu())
 
             acc, ce = traditional_cross_entropy_from_probs(probs, labels)
@@ -474,30 +530,47 @@ def test_unit(model, device, loader, unimodal=None):
             total_ce += ce * batch_size
             total_n += batch_size
 
-    return (
-        total_acc / total_n,
-        total_ce / total_n,
-        torch.cat(probs_list)
-    )
+            # ===== DIGIT ACCURACY =====
+            if unimodal is None:
+                img_acc = (output_digit_img.argmax(1) == labels_img).float().mean()
+                aud_acc = (output_digit_aud.argmax(1) == labels_aud).float().mean()
+
+                total_img_acc += img_acc.item() * batch_size
+                total_aud_acc += aud_acc.item() * batch_size
+
+    results = {
+        "acc": total_acc / total_n,
+        "ce": total_ce / total_n,
+        "probs": torch.cat(probs_list)
+    }
+
+    if unimodal is None:
+        results["img_digit_acc"] = total_img_acc / total_n
+        results["aud_digit_acc"] = total_aud_acc / total_n
+
+    return results
 
 def test(model, device, loader):
 
-    joint_acc, joint_ce, joint_probs = test_unit(model, device, loader)
-    vis_acc, vis_ce, vis_probs = test_unit(model, device, loader, 'visual')
-    aud_acc, aud_ce, aud_probs = test_unit(model, device, loader, 'audio')
+    joint = test_unit(model, device, loader)
+    vis = test_unit(model, device, loader, 'visual')
+    aud = test_unit(model, device, loader, 'audio')
 
     return {
-        "joint_acc": joint_acc,
-        "joint_ce": joint_ce,
-        "joint_probs": joint_probs,
+        "joint_acc": joint["acc"],
+        "joint_ce": joint["ce"],
+        "joint_probs": joint["probs"],
 
-        "vis_acc": vis_acc,
-        "vis_ce": vis_ce,
-        "vis_probs": vis_probs,
+        "vis_acc": vis["acc"],
+        "vis_ce": vis["ce"],
+        "vis_probs": vis["probs"],
 
-        "aud_acc": aud_acc,
-        "aud_ce": aud_ce,
-        "aud_probs": aud_probs,
+        "aud_acc": aud["acc"],
+        "aud_ce": aud["ce"],
+        "aud_probs": aud["probs"],
+
+        "img_digit_acc": joint["img_digit_acc"],
+        "aud_digit_acc": joint["aud_digit_acc"],
     }
 
 def extract_representations(model, loader, device):
@@ -570,6 +643,11 @@ def mnist(args):
             f"Joint Acc: {test_metrics['joint_acc']:.4f} | "
             f"Visual Acc: {test_metrics['vis_acc']:.4f} | "
             f"Audio Acc: {test_metrics['aud_acc']:.4f}"
+        )
+
+        print(
+            f"Digit Acc → Img: {test_metrics['img_digit_acc']:.4f} | "
+            f"Digit Acc → Aud: {test_metrics['aud_digit_acc']:.4f}"
         )
 
     # =======================

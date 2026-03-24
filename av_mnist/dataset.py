@@ -47,32 +47,68 @@ class AV_dataset(Dataset):
     def __getitem__(self, idx):
         return self.paired_samples[idx]
 
+def build_label_index(dataset):
+    label_to_indices = {i: [] for i in range(10)}
+
+    for idx in range(len(dataset)):
+        _, label = dataset[idx]
+        label_to_indices[int(label)].append(idx)
+
+    return label_to_indices
+
 class AV_dataset_sum(Dataset):
 
-    def __init__(self, mnist_dataset, audio_dataset, cutoff_sum):
+    def __init__(self, mnist_dataset, audio_dataset, cutoff_sum, samples_per_combination=100):
         self.mnist_dataset = mnist_dataset
         self.audio_dataset = audio_dataset
         self.cutoff_sum = cutoff_sum
 
+        # index by label
+        self.mnist_index = build_label_index(mnist_dataset)
+        self.audio_index = build_label_index(audio_dataset)
+
+        # build balanced pairs
+        self.pairs = []
+
+        for d_img in range(10):
+            for d_aud in range(10):
+
+                img_indices = self.mnist_index[d_img]
+                aud_indices = self.audio_index[d_aud]
+
+                if len(img_indices) == 0 or len(aud_indices) == 0:
+                    continue
+
+                for _ in range(samples_per_combination):
+                    i = random.choice(img_indices)
+                    j = random.choice(aud_indices)
+
+                    self.pairs.append((i, j, d_img, d_aud))
+
+        random.shuffle(self.pairs)
+
     def __len__(self):
-        # length defined by the smallest dataset
-        return min(len(self.mnist_dataset), len(self.audio_dataset))
+        return len(self.pairs)  # 🔑 use pairs length
 
     def __getitem__(self, idx):
 
-        # sample image
-        img, img_label = self.mnist_dataset[idx]
+        i, j, img_label, audio_label = self.pairs[idx]
 
-        # sample random audio digit
-        audio_idx = random.randint(0, len(self.audio_dataset) - 1)
-        audio, audio_label = self.audio_dataset[audio_idx]
+        # fetch data
+        img, _ = self.mnist_dataset[i]
+        audio, _ = self.audio_dataset[j]
 
+        # ensure shape (1, F, T)
         audio = torch.unsqueeze(audio, 0)
 
-        # binary target based on digit sum
+        # compute target
         digit_sum = img_label + audio_label
-
         target = 1 if digit_sum > self.cutoff_sum else 0
-        target = torch.tensor(target, dtype=torch.long)
 
-        return img, audio, target, img_label, audio_label
+        return (
+            img,
+            audio,
+            torch.tensor(target, dtype=torch.long),
+            torch.tensor(img_label, dtype=torch.long),
+            torch.tensor(audio_label, dtype=torch.long),
+        )
