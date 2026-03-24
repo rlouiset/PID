@@ -588,7 +588,7 @@ def mnist(args):
     # =======================
     # 1. DATA
     # =======================
-    cutoff_sum = 7
+    cutoff_sum = 6
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     # =======================
@@ -630,7 +630,7 @@ def mnist(args):
     # =======================
     # SAVE MODEL
     # =======================
-    save_path = "cnn_sum7_model.pt"
+    save_path = "cnn_sum" + str(cutoff_sum) + "_model.pt"
 
     torch.save({
         'model_state_dict': model.state_dict(),
