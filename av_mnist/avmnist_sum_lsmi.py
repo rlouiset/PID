@@ -544,7 +544,7 @@ def mnist(args):
     # =======================
     # 2. MODEL
     # =======================
-    model = CNN_sum(num_classes=2, emb_dim=512).to(device)
+    model = CNN_sum(num_classes=2).to(device)
     print(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
