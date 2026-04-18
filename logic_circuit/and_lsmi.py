@@ -11,10 +11,21 @@ import numpy as np
 from torch.utils.data import DataLoader
 import torch.optim as optim
 
-from utils_ours import return_redundancy_test_performances, compute_PID_categorical
-
 from utils_lsmi import MargKernel, cls_network
 from utils_lsmi import get_loader, setup_seed
+
+import torch, random, numpy as np, os
+
+seed = 42
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+random.seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+torch.use_deterministic_algorithms(True, warn_only=True)
 
 
 def RUS_adjustment(rus):
@@ -269,18 +280,25 @@ def test_unit(model, device, loader, unimodal=None):
 
     return avg_acc, avg_ce
 
-class XNORDataset(Dataset):
-    def __init__(self, n_samples=10000):
+class ANDDataset(Dataset):
+    def __init__(self, n_samples=10000, noise_std=0.1):
         self.x1 = torch.randint(0, 2, (n_samples, 1)).float()
         self.x2 = torch.randint(0, 2, (n_samples, 1)).float()
 
-        self.y = (self.x1 == self.x2).long().squeeze()
+        self.y = (self.x1 * self.x2).long().squeeze()
+        self.noise_std = noise_std
 
     def __len__(self):
         return len(self.y)
 
     def __getitem__(self, idx):
-        return self.x1[idx], self.x2[idx], self.y[idx]
+        x1 = self.x1[idx]
+        x2 = self.x2[idx]
+
+        noise1 = torch.randn_like(x1) * self.noise_std
+        noise2 = torch.randn_like(x2) * self.noise_std
+
+        return x1 + noise1, x2 + noise2, self.y[idx]
 
 class LogicNet(nn.Module):
 
@@ -383,8 +401,8 @@ def extract_representations(model, loader, device):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-train_set = XNORDataset(20000)
-test_set = XNORDataset(5000)
+train_set = ANDDataset(20000)
+test_set = ANDDataset(5000)
 
 train_loader = DataLoader(train_set, batch_size=512, shuffle=True)
 test_loader = DataLoader(test_set, batch_size=512)
@@ -420,8 +438,8 @@ parser.add_argument("--out-pt", type=str, default="lsmi_data.pt")
 parser.add_argument("--batch-size", type=int, default=512)
 parser.add_argument("--num-workers", type=int, default=0)
 parser.add_argument("--embed-size", type=int, default=32)
-parser.add_argument("--epochs-disc", type=int, default=50)
-parser.add_argument("--epochs-entropy", type=int, default=50)
+parser.add_argument("--epochs-disc", type=int, default=30)
+parser.add_argument("--epochs-entropy", type=int, default=30)
 parser.add_argument("--device", type=str, default="cpu")
 parser.add_argument("--seed", type=int, default=42)
 args = parser.parse_args()
@@ -459,8 +477,6 @@ cfg.num_epochs_entropy_estimator = args.epochs_entropy
 cfg.input_size_1 = train_z1.shape[1]
 cfg.input_size_2 = train_z2.shape[1]
 
-setup_seed(args.seed)
-
 # -------------------------
 # Load data
 # -------------------------
@@ -481,9 +497,15 @@ LSMI_estimation(train_loader, discriminator, entropy_estimator, cfg)
 print("\nValidation PID:")
 r, u1, u2, s = LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
 
+print(torch.mean(r))
+print(torch.mean(u1))
+print(torch.mean(u2))
+print(torch.mean(s))
+
 print((100*r[:10]).int().numpy())
 print((100*u1[:10]).int().numpy())
 print((100*u2[:10]).int().numpy())
 print((100*s[:10]).int().numpy())
-print(train_set.x1[:10, 0])
-print(train_set.x2[:10, 0])
+print(test_set.x1[:10, 0])
+print(test_set.x2[:10, 0])
+

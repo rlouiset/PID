@@ -33,7 +33,7 @@ parser.add_argument("--hidden-dim", default=512, type=int)
 parser.add_argument("--n-latent", default=512, type=int)
 parser.add_argument("--rank", default=32, type=int)
 parser.add_argument("--num-classes", default=2, type=int)
-parser.add_argument("--epochs", default=5, type=int)
+parser.add_argument("--epochs", default=30, type=int)
 parser.add_argument("--lr", default=1e-4, type=float)
 parser.add_argument("--weight-decay", default=0.01, type=float)
 parser.add_argument("--weight", default=1, type=float)
@@ -219,9 +219,11 @@ def compute_pointwise_pid(dict_of_metrics, num_classes):
         # ===== CLIPPING =====
         """modality0_ce = min(modality0_ce, h_y)
         modality1_ce = min(modality1_ce, h_y)"""
-        redundancy_ce = min(redundancy_ce, h_y)
 
-        redundancy_ce = max(redundancy_ce, joint_ce)
+        # redundancy_ce = max(redundancy_ce, joint_ce)
+        joint_ce = min(redundancy_ce, joint_ce)
+
+        redundancy_ce = min(redundancy_ce, h_y)
 
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
@@ -240,17 +242,11 @@ def compute_pointwise_pid(dict_of_metrics, num_classes):
 
         s = total - u0 - u1 - r_val
 
-        """if s > 0:
-            if u0 < 0 and u1 < 0:
-                s += 2*max(u0, u1)
-                u0 -= max(u0, u1)
-                u1 -= max(u0, u1)"""
-
-        if s < 0:
+        """if s < 0:
             r_val -= s
             u0 = h_y - modality0_ce - r_val
             u1 = h_y - modality1_ce - r_val
-            s = 0
+            s = 0"""
 
         pid_list.append([u0, u1, r_val, s])
 
@@ -288,19 +284,22 @@ def compute_pointwise_pid_with_source(dict_of_metrics, num_classes):
         h_y = -log_py_i
 
         # ===== CLIPPING =====
-        modality0_ce = min(modality0_ce, h_y)
-        modality1_ce = min(modality1_ce, h_y)
+        """modality0_ce = min(modality0_ce, h_y)
+        modality1_ce = min(modality1_ce, h_y)"""
+
+        # redundancy_ce = max(redundancy_ce, joint_ce)
+        joint_ce = min(redundancy_ce, joint_ce)
+        # source_redundancy_ce = max(source_redundancy_ce, joint_ce)
+        source_redundancy_ce = min(redundancy_ce, source_redundancy_ce)
+
         redundancy_ce = min(redundancy_ce, h_y)
         source_redundancy_ce = min(source_redundancy_ce, h_y)
-
-        redundancy_ce = max(redundancy_ce, joint_ce, modality0_ce, modality1_ce)
-        source_redundancy_ce = max(source_redundancy_ce, joint_ce, modality0_ce, modality1_ce)
 
         modality0_ce = max(modality0_ce, joint_ce)
         modality1_ce = max(modality1_ce, joint_ce)
 
-        modality0_ce = min(modality0_ce, redundancy_ce)
-        modality1_ce = min(modality1_ce, redundancy_ce)
+        """modality0_ce = min(modality0_ce, redundancy_ce)
+        modality1_ce = min(modality1_ce, redundancy_ce)"""
 
         # ===== INFORMATION =====
         total = h_y - joint_ce
@@ -308,16 +307,16 @@ def compute_pointwise_pid_with_source(dict_of_metrics, num_classes):
         # your design choice: strongest redundancy
         r_val = max(h_y - redundancy_ce, h_y - source_redundancy_ce)
 
-        u0 = max(0, h_y - modality0_ce - r_val)
-        u1 = max(0, h_y - modality1_ce - r_val)
+        u0 = h_y - modality0_ce - r_val
+        u1 = h_y - modality1_ce - r_val
 
         s = total - u0 - u1 - r_val
 
-        if s < 0:
+        """if s < 0:
             r_val -= s
             u0 = max(0, h_y - modality0_ce - r_val)
             u1 = max(0, h_y - modality1_ce - r_val)
-            s = 0
+            s = 0"""
 
         pid_list.append([u0, u1, r_val, s])
 
@@ -332,7 +331,6 @@ def compute_PID_categorical_with_source_decomposition(
     num_classes,
     targets
 ):
-    import torch
 
     # ===== 1. TRUE GLOBAL ENTROPY =====
     H_Y = compute_entropy_from_targets(targets, num_classes)
@@ -509,7 +507,7 @@ if __name__ == "__main__":
     dict_of_metrics["redundancy_ce"] = ccs.mean().item()
     dict_of_metrics["redundancy_pointwise_ce"] = ccs.numpy()
 
-    """# ========= 7. SOURCE REDUNDANCY =========
+    # ========= 7. SOURCE REDUNDANCY =========
     y_pred_dict = return_redundancy_test_performances(
         X_train_dict, X_val_dict, X_test_dict,
         y_train, y_val, y_test,
@@ -552,7 +550,7 @@ if __name__ == "__main__":
     print(np.mean(pid_source, axis=0))
     pid_norm = normalize_pid(pid_source)
     sim = cosine_similarity(pid_norm, weights_test)
-    print("Mean true per-sample cosine similarity with source:", sim.mean())"""
+    print("Mean true per-sample cosine similarity with source:", sim.mean())
 
     # ========= 9. POINTWISE PID WITHOUT SOURCE =========
     pid = compute_pointwise_pid(dict_of_metrics, args.num_classes)

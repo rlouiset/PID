@@ -98,11 +98,13 @@ class SyntheticDataset(Dataset):
                 raise NotImplementedError
             else:
                 tmp.append(torch.tensor(self.data[self.keys[i]][index]))
+
         tmp.append(torch.tensor(self.data[self.keys[-1]][index]))
         return tmp
 
 
 def process_input(inputs):
+
     processed_input = []
     labels = []
 
@@ -114,6 +116,7 @@ def process_input(inputs):
 
     for sample in inputs:  
         labels.append(sample[-1])
+
     processed_input.append(torch.tensor(labels).view(len(inputs),))
     
     return processed_input

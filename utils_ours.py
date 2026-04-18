@@ -230,8 +230,8 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
             sup_clip_loss = 100 * supclip_continuous(z0, z1, y, ids)
             align_loss = 1000 * (z0 - z1).norm(p=2, dim=1).pow(2).mean()
         elif self.distribution_target == "categorical":
-            pred_loss = F.cross_entropy(y_pred_0, y) + F.cross_entropy(y_pred_1, y) # F.cross_entropy(y_pred, y) +
-            sup_clip_loss = supervised_kernel_alignment(z0, z1, y) # supclip_categorical(z0, z1, y, ids)
+            pred_loss = F.cross_entropy(y_pred_0, y) + F.cross_entropy(y_pred_1, y) + F.cross_entropy(y_pred, y)
+            sup_clip_loss = supervised_kernel_alignment(z0, z1, y)
             align_loss = self.lambda_reg*(z0 - z1).norm(p=2, dim=1).pow(2).mean()
         else:
             raise NotImplementedError

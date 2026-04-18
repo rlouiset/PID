@@ -102,12 +102,12 @@ def test_unit(model, device, loader, unimodal=None):
 
     return avg_acc, avg_ce, torch.tensor(probs_list)
 
-class ORDataset(Dataset):
+class ANDDataset(Dataset):
     def __init__(self, n_samples=10000, noise_std=0.1):
         self.x1 = torch.randint(0, 2, (n_samples, 1)).float()
         self.x2 = torch.randint(0, 2, (n_samples, 1)).float()
 
-        self.y = ((self.x1 + self.x2) > 0).long().squeeze()
+        self.y = (self.x1 * self.x2).long().squeeze()
         self.noise_std = noise_std
 
     def __len__(self):
@@ -121,6 +121,7 @@ class ORDataset(Dataset):
         noise2 = torch.randn_like(x2) * self.noise_std
 
         return x1 + noise1, x2 + noise2, self.y[idx]
+
 
 class LogicNet(nn.Module):
 
@@ -524,8 +525,8 @@ def compute_entropy_from_targets(targets, num_classes):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-train_set = ORDataset(20000)
-test_set = ORDataset(5000)
+train_set = ANDDataset(20000)
+test_set = ANDDataset(5000)
 
 num_classes = 2
 
@@ -640,13 +641,4 @@ print(np.mean(pid_source, axis=0))
 pid = compute_pointwise_pid_from_probs(dict_of_metrics, num_classes)
 print(np.mean(pid, axis=0))
 
-# Cluster-wise pointwise PID
-x1_raw = test_set.x1.squeeze().numpy()
-x2_raw = test_set.x2.squeeze().numpy()
-
-for (v1, v2) in [(0,0), (1,0), (0,1), (1,1)]:
-    mask = (x1_raw == v1) & (x2_raw == v2)
-    y_val = int(test_set.y[mask][0])
-    vals = pid[mask].mean(axis=0)
-    print(f"({v1},{v2})→{y_val}  U0={vals[0]:.4f}  U1={vals[1]:.4f}  R={vals[2]:.4f}  S={vals[3]:.4f}")
 
