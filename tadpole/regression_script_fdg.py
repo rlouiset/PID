@@ -24,31 +24,12 @@ df = pd.merge(df_tadpole, df_adni, on=["RID", "VISCODE"], how="inner", suffixes=
 volumes_to_normalize = ["Ventricles_bl", "Hippocampus_bl", "Entorhinal_bl", "Fusiform_bl", "MidTemp_bl"]
 clinical_features = ["AGE", "PTEDUCAT", "PTGENDER", "APOE4", "ABETA_bl", "TAU_bl", "PTAU_bl"]
 
-# 10 AD-relevant regional FDG-PET features (bilateral key regions)
-pet_features = [
-    # Precuneus (bilateral)
-    "PRECUNL01_BAIPETNMRC_09_12_16",
-    "PRCUNSR01_BAIPETNMRC_09_12_16",
-    # Fusiform (bilateral)
-    "FUSFRML01_BAIPETNMRC_09_12_16",
-    "FUSFRMR01_BAIPETNMRC_09_12_16",
-    # Parahippocampal (bilateral)
-    "PARAHIPL01_BAIPETNMRC_09_12_16",
-    "PARAHIPR01_BAIPETNMRC_09_12_16",
-    # Hippocampus (bilateral)
-    "HIPPL01_BAIPETNMRC_09_12_16",
-    "HIPPR01_BAIPETNMRC_09_12_16",
-    # Posterior cingulate (bilateral)
-    "CINGPSTL01_BAIPETNMRC_09_12_16",
-    "CINGPSTR01_BAIPETNMRC_09_12_16",
-]
-
 target = "ADAS13"
 
 # ── 5. Prepare X and y ──────────────────────────────────────────────────────
 df["PTGENDER"] = df["PTGENDER"].map({"Male": 1, "Female": 0})
 
-for col in ["ABETA_bl", "TAU_bl", "PTAU_bl", "ICV", target] + volumes_to_normalize + pet_features:
+for col in ["ABETA_bl", "TAU_bl", "PTAU_bl", "ICV", target] + volumes_to_normalize:
     df[col] = pd.to_numeric(df[col], errors="coerce")
 
 # Normalize volumes by ICV
@@ -56,12 +37,11 @@ for col in volumes_to_normalize:
     df[col + "_norm"] = df[col] / df["ICV"]
 
 volumetric_features = [col + "_norm" for col in volumes_to_normalize]
-all_features = clinical_features + volumetric_features + ["FDG"] # + pet_features
+all_features = clinical_features + volumetric_features + ["FDG"]
 
 print(f"Total features: {len(all_features)}")
 print(f"  {len(clinical_features)} clinical")
 print(f"  {len(volumetric_features)} ICV-normalized volumetric")
-print(f"  {len(pet_features)} regional FDG-PET")
 
 df_model = df[all_features + [target]].dropna()
 print(f"\nSamples after dropping NaNs: {len(df_model)}")
