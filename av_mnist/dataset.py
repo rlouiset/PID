@@ -112,3 +112,58 @@ class AV_dataset_sum(Dataset):
             torch.tensor(img_label, dtype=torch.long),
             torch.tensor(audio_label, dtype=torch.long),
         )
+
+class AV_dataset_sum_dependent(Dataset):
+
+    def __init__(self, mnist_dataset, audio_dataset, cutoff_sum, samples_per_combination=100):
+        self.mnist_dataset = mnist_dataset
+        self.audio_dataset = audio_dataset
+        self.cutoff_sum = cutoff_sum
+
+        self.mnist_index = build_label_index(mnist_dataset)
+        self.audio_index = build_label_index(audio_dataset)
+
+        self.pairs = []
+
+        for d_img in range(10):
+            for d_aud in range(10):
+
+                # Enforce dependence: both above or both below cutoff
+                img_above = d_img > cutoff_sum
+                aud_above = d_aud > cutoff_sum
+                if img_above != aud_above:
+                    continue  # skip unique combinations
+
+                img_indices = self.mnist_index[d_img]
+                aud_indices = self.audio_index[d_aud]
+
+                if len(img_indices) == 0 or len(aud_indices) == 0:
+                    continue
+
+                for _ in range(samples_per_combination):
+                    i = random.choice(img_indices)
+                    j = random.choice(aud_indices)
+                    self.pairs.append((i, j, d_img, d_aud))
+
+        random.shuffle(self.pairs)
+
+    def __len__(self):
+        return len(self.pairs)
+
+    def __getitem__(self, idx):
+        i, j, img_label, audio_label = self.pairs[idx]
+
+        img, _ = self.mnist_dataset[i]
+        audio, _ = self.audio_dataset[j]
+        audio = torch.unsqueeze(audio, 0)
+
+        digit_sum = img_label + audio_label
+        target = 1 if digit_sum > self.cutoff_sum else 0
+
+        return (
+            img,
+            audio,
+            torch.tensor(target, dtype=torch.long),
+            torch.tensor(img_label, dtype=torch.long),
+            torch.tensor(audio_label, dtype=torch.long),
+        )

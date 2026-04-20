@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from model import CNN_sum
-from dataset import AV_dataset_sum
+from dataset import AV_dataset_sum_dependent
 from utils import TARGET_FRAMES, softmax, traditional_cross_entropy_from_probs
 from utils_ours import return_redundancy_test_performances
 
@@ -208,12 +208,12 @@ def prepare_dataset(args, cutoff_sum):
 
     a_train, a_test = load_fsdd()
 
-    AV_trainset = AV_dataset_sum(
+    AV_trainset = AV_dataset_sum_dependent(
         v_train, a_train, cutoff_sum,
         samples_per_combination=30
     )
 
-    AV_testset = AV_dataset_sum(
+    AV_testset = AV_dataset_sum_dependent(
         v_test, a_test, cutoff_sum,
         samples_per_combination=10
     )
@@ -705,8 +705,7 @@ def mnist(args):
         print(
             f"Joint Acc: {test_metrics['joint_acc']:.4f} | "
             f"Visual Acc: {test_metrics['vis_acc']:.4f} | "
-            f"Audio Acc: {test_metrics['aud_acc']:.4f}"
-        )
+            f"Audio Acc: {test_metrics['aud_acc']:.4f}")
 
         print(
             f"Digit Acc → Img: {test_metrics['img_digit_acc']:.4f} | "
@@ -724,12 +723,6 @@ def mnist(args):
     # }, save_path)
 
     # print(f"[✓] Model saved to {save_path}")
-
-
-    """checkpoint = torch.load("cnn_sum" + str(cutoff_sum) + "_model.pt", map_location=device)
-
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])"""
 
     model.eval()
 
@@ -876,52 +869,59 @@ def mnist(args):
     print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
 
     # =======================
-    # 9. Comparison with POINTWISE Human interpretation
+    # 9. Comparison: Source vs Mechanistic Redundancy per Subgroup
     # =======================
-    synergy_combinations = []
-    redundancy_combinations = []
-    unicity_0_combinations = []
-    unicity_1_combinations = []
-    for img_label, aud_label, pointwise_pid, ce_list_0, ce_list_1, ccs_i, log_py_i in zip(test_img_labels, test_audio_labels, pid_source, vis_probs, aud_probs, ccs, log_py):
-        if img_label + aud_label > cutoff_sum:
-            if img_label > cutoff_sum and aud_label > cutoff_sum:
-                redundancy_combinations.append(torch.tensor(pointwise_pid)[None, :])
-            elif img_label < cutoff_sum+1 and aud_label > cutoff_sum:
-                unicity_1_combinations.append(torch.tensor(pointwise_pid)[None, :])
-            elif img_label > cutoff_sum and aud_label < cutoff_sum+1:
-                unicity_0_combinations.append(torch.tensor(pointwise_pid)[None, :])
-            else:
-                synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
+
+    # We need BOTH pid (without source) and pid_source (with source)
+    # to compute the decomposition r_source vs r_mechanistic
+
+    synergy_pid = []
+    synergy_pid_source = []
+    redundancy_pid = []
+    redundancy_pid_source = []
+
+    for img_label, aud_label, pw_pid, pw_pid_src in zip(
+            test_img_labels, test_audio_labels, pid, pid_source
+    ):
+        is_y1 = (img_label + aud_label > cutoff_sum)
+        img_above = img_label > cutoff_sum
+        aud_above = aud_label > cutoff_sum
+
+        # In the dependent dataset, both are above or both below
+        # So we only have redundancy and synergy clusters
+        if img_above and aud_above:
+            # Redundancy cluster: both individually predict y=1
+            # Redundancy here should be SOURCE-driven (modalities correlated)
+            redundancy_pid.append(torch.tensor(pw_pid)[None, :])
+            redundancy_pid_source.append(torch.tensor(pw_pid_src)[None, :])
         else:
-            synergy_combinations.append(torch.tensor(pointwise_pid)[None, :])
+            # Synergy cluster: both digits ≤ cutoff
+            # Any redundancy here is MECHANISTIC (task structure, not correlation)
+            synergy_pid.append(torch.tensor(pw_pid)[None, :])
+            synergy_pid_source.append(torch.tensor(pw_pid_src)[None, :])
 
-    # print(debug)
+    # Aggregate
+    red_pid = torch.mean(torch.cat(redundancy_pid), dim=0)
+    red_pid_src = torch.mean(torch.cat(redundancy_pid_source), dim=0)
+    syn_pid = torch.mean(torch.cat(synergy_pid), dim=0)
+    syn_pid_src = torch.mean(torch.cat(synergy_pid_source), dim=0)
 
-    print("Synergy Combinations:", torch.mean(torch.cat(synergy_combinations), dim=0))
-    print("Redundancy Combinations:", torch.mean(torch.cat(redundancy_combinations), dim=0))
-    print("Unicity 0 Combinations:", torch.mean(torch.cat(unicity_0_combinations), dim=0))
-    print("Unicity 1 Combinations:", torch.mean(torch.cat(unicity_1_combinations), dim=0))
+    print("\n=== SOURCE vs MECHANISTIC REDUNDANCY ===")
+    print(f"Redundancy clusters (both > {cutoff_sum}):")
+    print(f"  PID [U0, U1, R, S]:        {red_pid}")
+    print(f"  PID+source [U0, U1, R, S]: {red_pid_src}")
+    r_total_red = max(red_pid[2].item(), 1e-12)
+    r_total_red_src = max(red_pid_src[2].item(), 1e-12)
+    # In pid_source, R is boosted by source redundancy
+    # The difference tells us how much is source vs mechanistic
+    print(f"  R (without source): {red_pid[2].item():.4f}")
+    print(f"  R (with source):    {red_pid_src[2].item():.4f}")
 
-    # POINTWISE COSINE SIMILARITY
-    list_of_pointwise_pids = [torch.cat(redundancy_combinations), torch.cat(unicity_0_combinations),
-                              torch.cat(unicity_1_combinations), torch.cat(synergy_combinations)]
-    list_pointwise_labels = [torch.cat([torch.tensor([0, 0, 1, 0])[None, :]] * len(list_of_pointwise_pids[0]), dim=0),
-                             torch.cat([torch.tensor([1, 0, 0, 0])[None, :]] * len(list_of_pointwise_pids[1]), dim=0),
-                             torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_of_pointwise_pids[2]), dim=0),
-                             torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_of_pointwise_pids[3]), dim=0)]
-
-    pid = torch.cat(list_of_pointwise_pids, dim=0).float().numpy()
-    pid_labels = torch.cat(list_pointwise_labels, dim=0).float().numpy()
-
-    pid = np.maximum(pid, 0)
-    pid /= pid.sum(axis=1, keepdims=True) + 1e-12
-
-    pid_l2 = pid / (np.linalg.norm(pid, axis=1, keepdims=True) + 1e-6)
-    labels_l2 = pid_labels / (np.linalg.norm(pid_labels, axis=1, keepdims=True) + 1e-6)
-
-    sim = np.sum(pid_l2 * labels_l2, axis=1)
-
-    print("\nMean cosine similarity (LSMI):", sim.mean())
+    print(f"\nSynergy clusters (both <= {cutoff_sum}):")
+    print(f"  PID [U0, U1, R, S]:        {syn_pid}")
+    print(f"  PID+source [U0, U1, R, S]: {syn_pid_src}")
+    print(f"  R (without source): {syn_pid[2].item():.4f}")
+    print(f"  R (with source):    {syn_pid_src[2].item():.4f}")
 
 if __name__ == '__main__':
     args = config().parse_args()
