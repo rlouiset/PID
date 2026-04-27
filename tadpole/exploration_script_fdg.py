@@ -25,7 +25,7 @@ df = df[df["DX_bl"].isin(valid_labels)]
 
 # ── 5. Define features & target ──────────────────────────────────────────────
 volumes_to_normalize = ["Ventricles", "Hippocampus", "Entorhinal", "Fusiform", "MidTemp"]
-clinical_features = ["ABETA_bl", "TAU_bl", "PTAU_bl", "AGE", "PTEDUCAT", "PTGENDER"] # "APOE4"
+clinical_features = ["ABETA_bl", "TAU_bl", "PTAU_bl", "APOE4", "AGE", "PTEDUCAT", "PTGENDER"]
 
 # 8 AD-relevant regional FDG-PET features (bilateral key regions)
 pet_features = [
@@ -51,7 +51,7 @@ target = "DX_bl"
 # ── 6. Prepare X and y ──────────────────────────────────────────────────────
 df["PTGENDER"] = df["PTGENDER"].map({"Male": 1, "Female": 0})
 
-for col in ["ABETA_bl", "TAU_bl", "PTAU_bl", "ICV"] + volumes_to_normalize + pet_features:
+for col in ["ABETA_bl", "TAU_bl", "PTAU_bl", "ICV"] + volumes_to_normalize + ["FDG"]: # + pet_features:
     df[col] = pd.to_numeric(df[col], errors="coerce")
 
 # Normalize volumes by ICV

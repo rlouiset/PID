@@ -39,7 +39,7 @@ for col in volumes_to_normalize:
     df[col + "_norm"] = df[col] / df["ICV"]
 
 volumetric_features = [col + "_norm" for col in volumes_to_normalize]
-all_features = clinical_features + volumetric_features #+ proteomic_features
+all_features = clinical_features + volumetric_features + proteomic_features
 
 print(f"Total features: {len(all_features)} ({len(clinical_features)} clinical + {len(volumetric_features)} ICV-normalized volumetric)")
 
