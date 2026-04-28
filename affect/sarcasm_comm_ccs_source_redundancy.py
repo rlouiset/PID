@@ -428,7 +428,10 @@ def compute_pointwise_pid_with_source(d, num_classes):
 
 def normalize_pid(pid):
     pid_ = np.maximum(pid, 0)
-    pid_ /= pid.sum(axis=1, keepdims=True) + 1e-12
+    for i, pid_i in enumerate(pid_):
+        sum_pid_i = np.sum(pid_i)
+        if sum_pid_i > 1e-3:
+            pid_[i] = pid_i / sum_pid_i
     return pid_
 
 
