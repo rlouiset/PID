@@ -15,4 +15,5 @@ conda deactivate # deactivate environments inherited by default
 module load miniforge/24.9.0
 conda activate py39
 export WANDB_MODE=offline
+export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID"
 srun python3 affect/mosei_ccs_source_redundancy.py --mod0 vision  --mod1 text
