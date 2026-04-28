@@ -37,7 +37,7 @@ parser.add_argument("--embed-dim", default=40, type=int,
                     help="Transformer embedding dim (40 as in CoMM/FactorCL)")
 parser.add_argument("--num-classes", default=2, type=int,
                     help="2=binary (pos/neg), 7=7-class sentiment")
-parser.add_argument("--epochs", default=40, type=int)
+parser.add_argument("--epochs", default=10, type=int)
 parser.add_argument("--lr", default=1e-3, type=float)
 parser.add_argument("--weight-decay", default=1e-2, type=float)
 parser.add_argument("--seq-len", default=50, type=int,
@@ -569,3 +569,18 @@ if __name__ == "__main__":
     print(f"\nMean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid_source, axis=0))
     print("Normalised mean:", np.mean(normalize_pid(pid_source), axis=0))
+
+    for i, pid_i in enumerate(pid_source):
+        if pid_i[0] < 0 and pid_i[1] >= 0:
+            pid_i[-1] += pid_i[0]
+            pid_i[0] = 0
+        if pid_i[1] < 0 and pid_i[0] >= 0:
+            pid_i[-1] += pid_i[1]
+            pid_i[1] = 0
+
+            pid_source[i] = pid_i
+
+    print(f"\n After correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
+    print(np.mean(pid_source, axis=0))
+    pid_norm = normalize_pid(pid_source)
+    print("After correction Normalised mean:", np.mean(pid_norm, axis=0))
