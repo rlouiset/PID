@@ -543,7 +543,7 @@ if __name__ == "__main__":
 
     # ========= 7. SOURCE REDUNDANCY =========
     y_pred_dict = return_redundancy_test_performances(
-        X_train, X_val, X_test, y_train, y_val, y_test,
+        X_train, X_val, X_test, y_train.long(), y_val.long(), y_test.long(),
         f"mosei_comm_{pair_name}",
         distribution_target="categorical",
         num_classes=args.num_classes,
