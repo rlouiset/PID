@@ -501,7 +501,7 @@ if __name__ == "__main__":
                     r.cpu().numpy(),  s.cpu().numpy()], axis=1)
 
     pid_clipped = np.maximum(pid, 0)
-    pid_norm = pid_clipped / pid_clipped.sum(axis=1, keepdims=True)
+    pid_norm = pid_clipped / (pid_clipped.sum(axis=1, keepdims=True) + 1e-12)
 
     print(f"\nMean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S] (test):")
     print(np.mean(pid, axis=0))
@@ -520,5 +520,5 @@ if __name__ == "__main__":
     print(f"\n After correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid, axis=0))
     pid_clipped = np.maximum(pid, 0)
-    pid_norm = pid_clipped / pid_clipped.sum(axis=1, keepdims=True)
+    pid_norm = pid_clipped / (pid_clipped.sum(axis=1, keepdims=True) + 1e-12)
     print("After correction Normalised mean:", np.mean(pid_norm, axis=0))
