@@ -508,12 +508,12 @@ if __name__ == "__main__":
     print("Normalised mean:", np.mean(pid_norm, axis=0))
 
     for i, pid_i in enumerate(pid):
-        if pid_i[1] < 0 and pid_i[2] >= 0:
+        if pid_i[0] < 0 and pid_i[1] >= 0:
+            pid_i[-1] += pid_i[0]
+            pid_i[0] = 0
+        if pid_i[1] < 0 and pid_i[0] >= 0:
             pid_i[-1] += pid_i[1]
             pid_i[1] = 0
-        if pid_i[2] < 0 and pid_i[1] >= 0:
-            pid_i[-1] += pid_i[2]
-            pid_i[2] = 0
 
             pid[i] = pid_i
 
