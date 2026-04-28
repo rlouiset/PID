@@ -498,12 +498,20 @@ if __name__ == "__main__":
     print(np.mean(pid, axis=0))
     print("Normalised mean:", np.mean(pid_norm, axis=0))
 
-    for i, pid_i in enumerate(pid):
+    """for i, pid_i in enumerate(pid):
         if pid_i[0] < 0 and pid_i[1] >= 0:
             pid_i[-1] += pid_i[0]; pid_i[0] = 0
         if pid_i[1] < 0 and pid_i[0] >= 0:
             pid_i[-1] += pid_i[1]; pid_i[1] = 0
-        pid[i] = pid_i
+        pid[i] = pid_i"""
+
+    for i, pid_i in enumerate(pid):
+        if pid_i[0] < 0 and pid_i[1] >= 0:
+            pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3] + pid_i[0]]
+            pid[i] = pid_i_copy
+        if pid_i[1] < 0 and pid_i[0] >= 0:
+            pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3] + pid_i[1]]
+            pid[i] = pid_i_copy
 
     pid_clipped = np.maximum(pid, 0)
     pid_norm = pid_clipped / (pid_clipped.sum(axis=1, keepdims=True) + 1e-12)

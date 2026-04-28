@@ -509,13 +509,11 @@ if __name__ == "__main__":
 
     for i, pid_i in enumerate(pid):
         if pid_i[0] < 0 and pid_i[1] >= 0:
-            pid_i[-1] += pid_i[0]
-            pid_i[0] = 0
+            pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3] + pid_i[0]]
+            pid[i] = pid_i_copy
         if pid_i[1] < 0 and pid_i[0] >= 0:
-            pid_i[-1] += pid_i[1]
-            pid_i[1] = 0
-
-            pid[i] = pid_i
+            pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3] + pid_i[1]]
+            pid[i] = pid_i_copy
 
     print(f"\n After correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid, axis=0))

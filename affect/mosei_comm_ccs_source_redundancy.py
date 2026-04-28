@@ -573,7 +573,6 @@ if __name__ == "__main__":
             pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3]+pid_i[0]]
             pid_source[i] = pid_i_copy
         if pid_i[1] < 0 and pid_i[0] >= 0:
-            pid_i[-1] += pid_i[1]
             pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3]+pid_i[1]]
             pid_source[i] = pid_i_copy
 
