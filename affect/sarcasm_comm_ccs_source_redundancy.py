@@ -34,7 +34,7 @@ parser.add_argument("--embed-dim", default=40, type=int,
 parser.add_argument("--epochs", default=10, type=int)
 parser.add_argument("--lr", default=1e-3, type=float)
 parser.add_argument("--weight-decay", default=1e-2, type=float)
-parser.add_argument("--seq-len", default=30, type=int,
+parser.add_argument("--seq-len", default=50, type=int,
                     help="Sequence length (50 for MUsTARD)")
 parser.add_argument("--pos-enc", action="store_true",
                     help="Add sinusoidal positional encoding (off by default)")
