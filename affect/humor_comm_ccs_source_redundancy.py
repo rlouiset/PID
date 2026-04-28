@@ -422,9 +422,9 @@ def compute_pointwise_pid_with_source(d, num_classes):
 
 
 def normalize_pid(pid):
-    pid = np.maximum(pid, 0)
-    pid /= pid.sum(axis=1, keepdims=True) + 1e-12
-    return pid
+    pid_ = np.maximum(pid, 0)
+    pid_ /= pid_.sum(axis=1, keepdims=True) + 1e-12
+    return pid_
 
 
 def compute_redundancy_metrics(y_pred_dict):
@@ -529,6 +529,11 @@ if __name__ == "__main__":
     # ========= 9. POINTWISE PID =========
     pid_source = compute_pointwise_pid_with_source(d, NUM_CLASSES)
 
+    print(f"\nMean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
+    print(np.mean(pid_source, axis=0))
+    pid_norm = normalize_pid(pid_source)
+    print("Normalised mean:", np.mean(pid_norm, axis=0))
+
     for i, pid_i in enumerate(pid_source):
         if pid_i[0] < 0 and pid_i[1] >= 0:
             pid_i[-1] += pid_i[0]; pid_i[0] = 0
@@ -536,7 +541,7 @@ if __name__ == "__main__":
             pid_i[-1] += pid_i[1]; pid_i[1] = 0
         pid_source[i] = pid_i
 
-    print(f"\nMean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
+    print(f"\nAfter Correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid_source, axis=0))
     pid_norm = normalize_pid(pid_source)
-    print("Normalised mean:", np.mean(pid_norm, axis=0))
+    print("After Correction Normalised mean:", np.mean(pid_norm, axis=0))
