@@ -30,8 +30,8 @@ parser.add_argument("--bs", default=16, type=int,
                     help="Small default batch size given the small dataset (414 train samples)")
 parser.add_argument("--num-workers", default=4, type=int)
 parser.add_argument("--embed-dim", default=40, type=int,
-                    help="Transformer embedding dim (40 as in CoMM/FactorCL)")
-parser.add_argument("--epochs", default=40, type=int)
+                    help="Transformer embedding dim (10 as in CoMM/FactorCL)")
+parser.add_argument("--epochs", default=10, type=int)
 parser.add_argument("--lr", default=1e-3, type=float)
 parser.add_argument("--weight-decay", default=1e-2, type=float)
 parser.add_argument("--seq-len", default=50, type=int,
