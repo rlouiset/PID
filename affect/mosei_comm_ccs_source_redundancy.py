@@ -29,7 +29,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # /Users/robinlouiset/Downloads/mosei_senti_data.pkl
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data-path", default="/lustre/fshomisc/home/rech/genpuc01/uik24xv/mosei_senti_data.pkl", type=str)
+parser.add_argument("--data-path", default="/lustre/fswork/projects/rech/haj/uik24xv/local/mosei_senti_data.pkl", type=str)
 parser.add_argument("--bs", default=32, type=int)
 parser.add_argument("--num-workers", default=4, type=int)
 parser.add_argument("--embed-dim", default=40, type=int,
