@@ -26,7 +26,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data-path", default="/home/rlouiset/sarcasm.pkl", type=str)
-parser.add_argument("--bs", default=16, type=int,
+parser.add_argument("--bs", default=32, type=int,
                     help="Small default batch size given the small dataset (414 train samples)")
 parser.add_argument("--num-workers", default=4, type=int)
 parser.add_argument("--embed-dim", default=40, type=int,
@@ -34,7 +34,7 @@ parser.add_argument("--embed-dim", default=40, type=int,
 parser.add_argument("--epochs", default=10, type=int)
 parser.add_argument("--lr", default=1e-3, type=float)
 parser.add_argument("--weight-decay", default=1e-2, type=float)
-parser.add_argument("--seq-len", default=50, type=int,
+parser.add_argument("--seq-len", default=30, type=int,
                     help="Sequence length (50 for MUsTARD)")
 parser.add_argument("--pos-enc", action="store_true",
                     help="Add sinusoidal positional encoding (off by default)")
