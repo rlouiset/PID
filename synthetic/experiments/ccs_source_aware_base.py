@@ -398,11 +398,11 @@ def normalize_pid(pid):
     """
     pid = np.maximum(pid, 0)
 
-    row_sums = pid.sum(axis=1, keepdims=True)
-    zero_rows = row_sums.squeeze() == 0
+    #row_sums = pid.sum(axis=1, keepdims=True)
+    #zero_rows = row_sums.squeeze() == 0
 
-    pid[zero_rows] = 1.0 / pid.shape[1]
-    pid /= pid.sum(axis=1, keepdims=True)
+    #pid[zero_rows] = 1.0 / pid.shape[1]
+    pid /= pid.sum(axis=1, keepdims=True) + 1e-12
 
     return pid
 

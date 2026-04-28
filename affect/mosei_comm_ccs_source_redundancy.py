@@ -455,7 +455,7 @@ def compute_pointwise_pid_with_source(d, num_classes):
 
 
 def normalize_pid(pid):
-    pid      = np.maximum(pid, 0)
+    pid = np.maximum(pid, 0)
     pid /= pid.sum(axis=1, keepdims=True) + 1e-12
     return pid
 
@@ -570,13 +570,12 @@ if __name__ == "__main__":
 
     for i, pid_i in enumerate(pid_source):
         if pid_i[0] < 0 and pid_i[1] >= 0:
-            pid_i[-1] += pid_i[0]
-            pid_i[0] = 0
+            pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3]+pid_i[0]]
+            pid_source[i] = pid_i_copy
         if pid_i[1] < 0 and pid_i[0] >= 0:
             pid_i[-1] += pid_i[1]
-            pid_i[1] = 0
-
-            pid_source[i] = pid_i
+            pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3]+pid_i[1]]
+            pid_source[i] = pid_i_copy
 
     print(f"\n After correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid_source, axis=0))
