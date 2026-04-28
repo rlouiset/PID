@@ -247,6 +247,57 @@ def get_entropy(loader, model, modality):
             info.append(model(x))
     return torch.cat(info).detach()
 
+def RUS_adjustment(rus):
+    """
+    Adjusts the input tensors (r, u1, u2, s) while preserving certain sums
+    and the original device of the tensors. The adjustment aims to make the
+    means of these components non-negative based on a specific priority:
+
+    1. If the mean of 'r' (R_mean) or 's' (S_mean) is negative, an adjustment
+       factor is calculated to make both R_mean and S_mean non-negative.
+       This adjustment might consequently alter the means of 'u1' (U1_mean)
+       and 'u2' (U2_mean), potentially making them negative.
+
+    2. If R_mean and S_mean are already non-negative, but U1_mean or U2_mean
+       is negative, the adjustment factor is calculated to make both U1_mean
+       and U2_mean non-negative. This adjustment might, in turn, make
+       R_mean or S_mean negative if they were small positive values.
+
+    The adjustment maintains the following sum properties for the means:
+    - (R_mean + U1_mean + U2_mean + S_mean) remains unchanged.
+    - (R_mean + U1_mean) remains unchanged.
+    - (R_mean + U2_mean) remains unchanged.
+
+    Args:
+        rus (tuple or list): A collection of four PyTorch tensors (r, u1, u2, s).
+
+    Returns:
+        tuple: A tuple of four adjusted PyTorch tensors (r_adjusted, u1_adjusted,
+               u2_adjusted, s_adjusted), on the same device as the input tensors.
+    """
+    r_orig, u_1_orig, u_2_orig, s_orig = rus
+
+    R_mean = r_orig.detach().mean()
+    U1_mean = u_1_orig.detach().mean()
+    U2_mean = u_2_orig.detach().mean()
+    S_mean = s_orig.detach().mean()
+
+    adj_factor = torch.tensor(0.0, dtype=R_mean.dtype, device=R_mean.device)
+
+    # Priority 1: Address negative mean of r or s
+    if R_mean < 0 or S_mean < 0:
+        adj_factor = -torch.min(R_mean, S_mean)
+
+    # Priority 2: If means of r and s are non-negative, address negative mean of u1 or u2
+    elif U1_mean < 0 or U2_mean < 0:
+        adj_factor = torch.min(U1_mean, U2_mean)
+
+    r_adjusted = r_orig + adj_factor
+    u_1_adjusted = u_1_orig - adj_factor
+    u_2_adjusted = u_2_orig - adj_factor
+    s_adjusted = s_orig + adj_factor
+
+    return r_adjusted, u_1_adjusted, u_2_adjusted, s_adjusted
 
 def LSMI_estimation(loader, discriminators, entropy_estimators, n_classes, split_name=""):
     """
@@ -265,9 +316,15 @@ def LSMI_estimation(loader, discriminators, entropy_estimators, n_classes, split
     u1 = I1Y  - r
     u2 = I2Y  - r
     s  = I12Y - r - u1 - u2
+    r_adjusted, u_1_adjusted, u_2_adjusted, s_adjusted = RUS_adjustment([r, u1, u2, s])
 
-    label = f"[{split_name}] " if split_name else ""
-    print(f"{label}R={r.mean():.4f}  U_image={u1.mean():.4f}  U_audio={u2.mean():.4f}  S={s.mean():.4f}")
+    R = torch.mean(r_adjusted)
+    U_1 = torch.mean(u_1_adjusted)
+    U_2 = torch.mean(u_2_adjusted)
+    S = torch.mean(s_adjusted)
+
+    print(f"R: {R.item():.4f}, U1: {U_1.item():.4f}, U2: {U_2.item():.4f}, S: {S.item():.4f}")
+
     return r, u1, u2, s
 
 
@@ -334,7 +391,7 @@ if __name__ == '__main__':
     )
 
     # ========= 6. LSMI PID (raw) =========
-    print("\nPointwise PID (raw means, no RUS adjustment):")
+    print("\nPID (RUS adjustment):")
     LSMI_estimation(lsmi_train, discriminators, entropy_estimators, n_classes, "train")
     r, u1, u2, s = LSMI_estimation(lsmi_test, discriminators, entropy_estimators, n_classes, "test")
 
@@ -348,15 +405,3 @@ if __name__ == '__main__':
     pid_norm = normalize_pid(pid)
     print("Normalised mean:", np.mean(pid_norm, axis=0))
 
-    # ========= 8. CORRECTION (distribution level only) =========
-    for i, pid_i in enumerate(pid):
-        if pid_i[0] < 0 and pid_i[1] >= 0:
-            pid_i[-1] += pid_i[0]; pid_i[0] = 0
-        if pid_i[1] < 0 and pid_i[0] >= 0:
-            pid_i[-1] += pid_i[1]; pid_i[1] = 0
-        pid[i] = pid_i
-
-    print("\nAfter Correction  Mean pointwise PID [U_image, U_audio, R, S]:")
-    print(np.mean(pid, axis=0))
-    pid_norm = normalize_pid(pid)
-    print("After Correction  Normalised mean:", np.mean(pid_norm, axis=0))

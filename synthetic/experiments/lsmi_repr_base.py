@@ -34,15 +34,15 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 parser = argparse.ArgumentParser()
 # Data / model (mirrors ccs_source_aware_base)
 parser.add_argument("--data-path",    default="SIMPLE_DATA_DIM=3_STD=0.5.pickle", type=str)
-parser.add_argument("--keys",         nargs='+', default=['a','b','c','d','e','label'], type=str)
+parser.add_argument("--keys",         nargs='+', default=['0', '1', 'label'], type=str)
 parser.add_argument("--modalities",   nargs='+', default=[0, 1], type=int)
-parser.add_argument("--bs",           default=32,    type=int)
+parser.add_argument("--bs",           default=1024,    type=int)
 parser.add_argument("--num-workers",  default=4,     type=int)
-parser.add_argument("--input-dim",    nargs='+',     default=30,   type=int)
-parser.add_argument("--hidden-dim",   default=512,   type=int)
-parser.add_argument("--n-latent",     default=512,   type=int)
+parser.add_argument("--input-dim",    nargs='+',     default=[200], type=int)
+parser.add_argument("--hidden-dim",   default=32,   type=int)
+parser.add_argument("--n-latent",     default=32,   type=int)
 parser.add_argument("--num-classes",  default=2,     type=int)
-parser.add_argument("--epochs",       default=30,    type=int)
+parser.add_argument("--epochs",       default=100,    type=int)
 parser.add_argument("--lr",           default=1e-4,  type=float)
 parser.add_argument("--weight-decay", default=0.01,  type=float)
 parser.add_argument("--saved-model",  default=None,  type=str)
@@ -73,7 +73,6 @@ def RUS_adjustment(rus):
         adj = torch.min(U1_mean, U2_mean)
     return r_orig + adj, u_1_orig - adj, u_2_orig - adj, s_orig + adj
 
-
 def normalize_pid(pid):
     pid = np.maximum(pid, 0)
     pid /= pid.sum(axis=1, keepdims=True) + 1e-12
@@ -81,8 +80,8 @@ def normalize_pid(pid):
 
 
 def cosine_similarity(a, b):
-    a = a / np.linalg.norm(a, axis=1, keepdims=True)
-    b = b / np.linalg.norm(b, axis=1, keepdims=True)
+    a = a / (np.linalg.norm(a, axis=1, keepdims=True) + 1e-12)
+    b = b / (np.linalg.norm(b, axis=1, keepdims=True) + 1e-12)
     return np.sum(a * b, axis=1)
 
 
@@ -264,10 +263,10 @@ if __name__ == '__main__':
 
     # ========= 6. BUILD LSMI LOADERS =========
     lsmi_train = DataLoader(
-        feature_dataset(train_z1, train_z2, y_train),
+        feature_dataset(train_z1, train_z2, y_train.long()),
         batch_size=args.lsmi_bs, shuffle=True,  num_workers=0)
     lsmi_test  = DataLoader(
-        feature_dataset(test_z1,  test_z2,  y_test),
+        feature_dataset(test_z1,  test_z2,  y_test.long()),
         batch_size=args.lsmi_bs, shuffle=False, num_workers=0)
 
     # ========= 7. TRAIN LSMI ESTIMATORS =========
