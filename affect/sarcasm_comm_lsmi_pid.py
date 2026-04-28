@@ -401,12 +401,13 @@ def LSMI_estimation(loader, discriminators, entropy_estimators, n_classes, split
           f"S={s_adj.mean():.4f}")
     return r, u1, u2, s
 
-
 def normalize_pid(pid):
-    pid = np.maximum(pid, 0)
-    pid /= pid.sum(axis=1, keepdims=True) + 1e-12
-    return pid
-
+    pid_ = np.maximum(pid, 0)
+    for i, pid_i in enumerate(pid_):
+        sum_pid_i = np.sum(pid_i)
+        if sum_pid_i > 1e-3:
+            pid_[i] = pid_i / sum_pid_i
+    return pid_
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -513,13 +514,17 @@ if __name__ == "__main__":
     print("Normalised mean:", np.mean(pid_norm, axis=0))
 
     # ========= 9. CORRECTION (distribution level only) =========
-    for i, pid_i in enumerate(pid):
+    updated_pid = []
+    for pid_i in pid:
+        pid_i = list(pid_i)
         if pid_i[0] < 0 and pid_i[1] >= 0:
-            pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3] + pid_i[0]]
-            pid[i] = pid_i_copy
-        if pid_i[1] < 0 and pid_i[0] >= 0:
-            pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3] + pid_i[1]]
-            pid[i] = pid_i_copy
+            pid_i[3] += pid_i[0];
+            pid_i[0] = 0
+        elif pid_i[1] < 0 and pid_i[0] >= 0:
+            pid_i[3] += pid_i[1];
+            pid_i[1] = 0
+        updated_pid.append(pid_i)
+    pid = np.array(updated_pid)
 
     print(f"\nAfter Correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid, axis=0))
