@@ -537,26 +537,19 @@ if __name__ == "__main__":
     # ========= 9. POINTWISE PID =========
     pid_source = compute_pointwise_pid_with_source(d, NUM_CLASSES)
 
-    for i, pid_i in enumerate(pid_source):
-        if pid_i[0] < 0 and pid_i[1] >= 0:
-            pid_i[-1] += pid_i[0]; pid_i[0] = 0
-        if pid_i[1] < 0 and pid_i[0] >= 0:
-            pid_i[-1] += pid_i[1]; pid_i[1] = 0
-        pid_source[i] = pid_i
-
     print(f"\nMean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid_source, axis=0))
     pid_norm = normalize_pid(pid_source)
     print("Normalised mean:", np.mean(pid_norm, axis=0))
 
     updated_pid_source = []
-    for i, pid_i in enumerate(pid_source):
+    for pid_i in pid_source:
+        pid_i = list(pid_i)
         if pid_i[0] < 0 and pid_i[1] >= 0:
-            pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3] + pid_i[0]]
-            updated_pid_source.append(pid_i_copy)
-        if pid_i[1] < 0 and pid_i[0] >= 0:
-            pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3] + pid_i[1]]
-            updated_pid_source.append(pid_i_copy)
+            pid_i[3] += pid_i[0]; pid_i[0] = 0
+        elif pid_i[1] < 0 and pid_i[0] >= 0:
+            pid_i[3] += pid_i[1]; pid_i[1] = 0
+        updated_pid_source.append(pid_i)
     pid_source = np.array(updated_pid_source)
 
     print(f"\nAfter Correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
