@@ -265,8 +265,8 @@ def train(
                     patience = 0
                     bestloss = loss
                     print("Saving Best")
+                    best_model = copy.deepcopy(model)
                     if save:
-                        best_model = copy.deepcopy(model)
                         torch.save(model, save)
                 else:
                     patience += 1

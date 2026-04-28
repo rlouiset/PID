@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import time
 import numpy as np
-from eval_scripts.performance import AUPRC, f1_score, accuracy, eval_affect
+from eval_scripts.performance import AUPRC, f1_score, accuracy
 from eval_scripts.complexity import all_in_one_train, all_in_one_test
 from eval_scripts.robustness import relative_robustness, effective_robustness, single_plot
 from test import *
