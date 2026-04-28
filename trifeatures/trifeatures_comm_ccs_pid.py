@@ -45,7 +45,7 @@ softmax = nn.Softmax(dim=-1)
 # ─── Args ─────────────────────────────────────────────────────────────────────
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data-root",    default="./trifeatures_data", type=str,
+parser.add_argument("--data-root",    default="/home/rlouiset/trifeatures_data", type=str,
                     help="Directory to store / load generated PNG images")
 parser.add_argument("--task",         default="share",
                     choices=["share", "unique1", "unique2", "synergy"])
