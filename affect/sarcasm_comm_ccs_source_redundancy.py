@@ -549,13 +549,15 @@ if __name__ == "__main__":
     pid_norm = normalize_pid(pid_source)
     print("Normalised mean:", np.mean(pid_norm, axis=0))
 
+    updated_pid_source = []
     for i, pid_i in enumerate(pid_source):
         if pid_i[0] < 0 and pid_i[1] >= 0:
             pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3] + pid_i[0]]
-            pid_source[i] = pid_i_copy
+            updated_pid_source.append(pid_i_copy)
         if pid_i[1] < 0 and pid_i[0] >= 0:
             pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3] + pid_i[1]]
-            pid_source[i] = pid_i_copy
+            updated_pid_source.append(pid_i_copy)
+    pid_source = np.array(updated_pid_source)
 
     print(f"\nAfter Correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid_source, axis=0))
