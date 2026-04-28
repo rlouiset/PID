@@ -498,9 +498,9 @@ if __name__ == "__main__":
 
     # ========= 7. LSMI PID ESTIMATION =========
     print("\nPID:")
-    LSMI_estimation(lsmi_train, discriminators, entropy_estimators, "train")
-    LSMI_estimation(lsmi_val,   discriminators, entropy_estimators, "val")
-    r, u1, u2, s = LSMI_estimation(lsmi_test, discriminators, entropy_estimators, "test")
+    LSMI_estimation(lsmi_train, discriminators, entropy_estimators, NUM_CLASSES, "train")
+    LSMI_estimation(lsmi_val,   discriminators, entropy_estimators, NUM_CLASSES, "val")
+    r, u1, u2, s = LSMI_estimation(lsmi_test, discriminators, entropy_estimators, NUM_CLASSES, "test")
 
     # ========= 8. POINTWISE DISTRIBUTION =========
     # Stack as [U_mod0, U_mod1, R, S]
