@@ -385,18 +385,30 @@ class BimodalTrifeatures(Trifeatures):
         share_vals = targets[:, a2i[self.share_attr]]
         share_eq   = (share_vals.reshape(n, 1) == share_vals.reshape(1, n))
 
-        if self.biased:
-            sv0 = targets[:, a2i[self.synergy_attr[0]]]
-            sv1 = targets[:, a2i[self.synergy_attr[1]]]
-            synergy_eq = np.zeros((n, n), dtype=bool)
-            for p in self.correlated_feature_pairs:
-                m0 = (sv0.reshape(n, 1) == p[0]).repeat(n, axis=1)
-                m1 = (sv1.reshape(1, n) == p[1]).repeat(n, axis=0)
-                synergy_eq |= (m0 & m1)
-        else:
-            synergy_eq = np.ones((n, n), dtype=bool)
+        # Always compute synergy mask (needed for balanced synergy task)
+        sv0 = targets[:, a2i[self.synergy_attr[0]]]
+        sv1 = targets[:, a2i[self.synergy_attr[1]]]
+        synergy_eq = np.zeros((n, n), dtype=bool)
+        for p in self.correlated_feature_pairs:
+            m0 = (sv0.reshape(n, 1) == p[0]).repeat(n, axis=1)
+            m1 = (sv1.reshape(1, n) == p[1]).repeat(n, axis=0)
+            synergy_eq |= (m0 & m1)
 
-        allowed = np.argwhere(share_eq & synergy_eq)
+        if self.task == "synergy":
+            # Supervised synergy classification: balance positive (label=1) and
+            # negative (label=0) pairs so that H(Y) > 0 and the model can learn.
+            # biased flag is ignored here — both classes must be present.
+            pos = np.argwhere(share_eq & synergy_eq)
+            neg = np.argwhere(share_eq & ~synergy_eq)
+            n_each = min(len(pos), len(neg), self.max_size // 2)
+            pos_sel = self.rng.choice(len(pos), size=n_each, replace=False)
+            neg_sel = self.rng.choice(len(neg), size=n_each, replace=False)
+            pairs = np.vstack([pos[pos_sel], neg[neg_sel]])
+            self.rng.shuffle(pairs)
+            return pairs
+
+        allowed = np.argwhere(share_eq & (synergy_eq if self.biased
+                                          else np.ones((n, n), dtype=bool)))
         n_allowed = len(allowed)
         if self.max_size > n_allowed:
             self.max_size = n_allowed
