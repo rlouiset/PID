@@ -317,7 +317,7 @@ def return_redundancy_test_performances(
     y_train, y_val, y_test,
     config_name,
     ids_train=None, ids_val=None, ids_test=None,
-    distribution_target="gaussian", lambda_reg=10, num_classes=1, h_dim=1024
+    distribution_target="gaussian", lambda_reg=10, num_classes=1, h_dim=1024, lr=1e-4
 ):
 
     if ids_train is None:
@@ -339,7 +339,8 @@ def return_redundancy_test_performances(
     pl_model = RedundancyRepresentationLightningModel(
         model,
         distribution_target=distribution_target,
-        lambda_reg=lambda_reg
+        lambda_reg=lambda_reg,
+        lr=lr
     )
 
     checkpoint_dir = f"checkpoints/{config_name}/redundancy"

@@ -862,6 +862,7 @@ if __name__ == "__main__":
         f"trifeatures_{args.task}_biased={args.biased}",
         distribution_target="categorical",
         num_classes=NUM_CLASSES,
+        lr=1e-5
     )
 
     results = compute_redundancy_metrics(y_pred_dict)
