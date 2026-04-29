@@ -53,7 +53,7 @@ softmax = nn.Softmax(dim=-1)
 
 parser = argparse.ArgumentParser()
 # Data
-parser.add_argument("--data-root",    default="/Users/robinlouiset/Downloads/Food101", type=str)
+parser.add_argument("--data-root",    default="/home/rlouiset/Food101", type=str)
 parser.add_argument("--img-size",     default=224, type=int,
                     help="Resize images to this size (use 384 with blip_vit for best quality)")
 parser.add_argument("--max-txt-len",  default=64,  type=int,
