@@ -287,7 +287,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
 # Trainer helper
 # =========================
 def create_redundancy_trainer(
-    max_epochs=100,
+    max_epochs=200,
     config_name="model",
     accelerator: Literal["cpu", "gpu", "auto"] = "auto",
     checkpoint_dir="checkpoints",
