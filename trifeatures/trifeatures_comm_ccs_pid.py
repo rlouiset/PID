@@ -55,12 +55,10 @@ parser.add_argument("--num-classes",  default=10,  type=int,
                     help="10 for share/unique tasks, 2 for synergy")
 parser.add_argument("--bs",           default=64,  type=int)
 parser.add_argument("--num-workers",  default=4,   type=int)
-parser.add_argument("--embed-dim",    default=40,  type=int,
-                    help="Transformer embedding dim (same as CoMM affect scripts)")
-parser.add_argument("--cnn-channels", default=128, type=int,
-                    help="CNN backbone output channels (= CoMMEncoder input dim)")
+parser.add_argument("--embed-dim",    default=512, type=int,
+                    help="FusionTransformer width (512 as in CoMM notebook)")
 parser.add_argument("--epochs",       default=50,  type=int)
-parser.add_argument("--lr",           default=1e-3, type=float)
+parser.add_argument("--lr",           default=1e-4, type=float)
 parser.add_argument("--weight-decay", default=1e-2, type=float)
 parser.add_argument("--saved-model",  default=None, type=str)
 args = parser.parse_args()
@@ -466,114 +464,109 @@ def get_dataloaders(data_root, task, biased, bs, num_workers):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CoMM ARCHITECTURE (exact same as affect scripts)
+# CoMM ARCHITECTURE  (exact match to Duplums/CoMM trifeatures.ipynb)
+#   AlexNetEncoder → PatchedInputAdapter → FusionTransformer (CLS, 1-layer)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class ImageBackbone(nn.Module):
+def _build_2d_sincos_posemb(h, w, embed_dim):
+    """2D sinusoidal position embedding, shape (1, embed_dim, h, w)."""
+    assert embed_dim % 4 == 0
+    pos_dim = embed_dim // 4
+    omega   = 1. / (10000 ** (torch.arange(pos_dim, dtype=torch.float32) / pos_dim))
+    grid_w, grid_h = torch.meshgrid(torch.arange(w, dtype=torch.float32),
+                                     torch.arange(h, dtype=torch.float32),
+                                     indexing='ij')
+    out_w = torch.einsum('m,d->md', grid_w.reshape(-1), omega)
+    out_h = torch.einsum('m,d->md', grid_h.reshape(-1), omega)
+    pos   = torch.cat([torch.sin(out_w), torch.cos(out_w),
+                       torch.sin(out_h), torch.cos(out_h)], dim=1)  # (h*w, D)
+    return pos.reshape(h, w, embed_dim).permute(2, 0, 1).unsqueeze(0)  # (1, D, h, w)
+
+
+class AlexNetEncoder(nn.Module):
     """
-    Lightweight CNN: (B, 3, 224, 224) → (B, T, cnn_channels) spatial token sequence.
-    Uses AdaptiveAvgPool2d(4) → T = 16 spatial tokens, matching CoMMEncoder input.
+    AlexNet feature extractor (no global pool).
+    Input: (B, 3, 224, 224)  →  Output: (B, 256, 6, 6)
+    Matches AlexNetEncoder(latent_dim=512, global_pool="") in the CoMM repo.
     """
-    def __init__(self, out_channels=128):
+    def __init__(self):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(3,           32,  3, padding=1), nn.BatchNorm2d(32),  nn.ReLU(),
-            nn.MaxPool2d(2),                                                            # 112
-            nn.Conv2d(32,          64,  3, padding=1), nn.BatchNorm2d(64),  nn.ReLU(),
-            nn.MaxPool2d(2),                                                            # 56
-            nn.Conv2d(64,          128, 3, padding=1), nn.BatchNorm2d(128), nn.ReLU(),
-            nn.MaxPool2d(2),                                                            # 28
-            nn.Conv2d(128, out_channels, 3, padding=1), nn.BatchNorm2d(out_channels), nn.ReLU(),
-            nn.AdaptiveAvgPool2d(4),                                                    # 4×4
-        )
+        from torchvision.models import alexnet
+        self.features = alexnet(weights=None).features
 
     def forward(self, x):
-        f = self.net(x)                              # (B, C, 4, 4)
-        B, C, H, W = f.shape
-        return f.view(B, H * W, C)                   # (B, 16, C)
+        return self.features(x)   # (B, 256, 6, 6)
 
 
-def _build_sincos_posemb(max_seq_len, embed_dim):
-    pe  = torch.zeros(max_seq_len, embed_dim)
-    pos = torch.arange(0, max_seq_len).unsqueeze(1).float()
-    div = torch.exp(torch.arange(0, embed_dim, 2).float()
-                    * -(math.log(10000.0) / embed_dim))
-    pe[:, 0::2] = torch.sin(pos * div)
-    pe[:, 1::2] = torch.cos(pos * div)
-    return pe.unsqueeze(0)
-
-
-class CoMMEncoder(nn.Module):
-    """Conv1d projection → 5-layer pre-norm Transformer. Input: (B, T, n_features)."""
-    def __init__(self, n_features, embed_dim=40, max_seq_len=16,
-                 n_heads=5, n_layers=5, positional_encoding=False):
+class PatchedInputAdapter(nn.Module):
+    """
+    1×1 Conv2d projection + 2D sincos pos-embedding.
+    (B, 256, 6, 6)  →  (B, 36, dim_tokens)
+    Matches PatchedInputAdapter(num_channels=256, stride_level=1,
+                                patch_size_full=1, dim_tokens=512, image_size=6).
+    """
+    def __init__(self, num_channels=256, dim_tokens=512, image_size=6):
         super().__init__()
-        self.conv      = nn.Conv1d(n_features, embed_dim, kernel_size=1, bias=False)
-        self.use_pe    = positional_encoding
-        if positional_encoding:
-            self.register_buffer("pos_emb", _build_sincos_posemb(max_seq_len, embed_dim))
-        layer = nn.TransformerEncoderLayer(
-            d_model=embed_dim, nhead=n_heads,
-            batch_first=True, norm_first=True,
-        )
-        self.transformer = nn.TransformerEncoder(layer, num_layers=n_layers)
+        self.proj = nn.Conv2d(num_channels, dim_tokens, kernel_size=1, stride=1)
+        pos = _build_2d_sincos_posemb(image_size, image_size, dim_tokens)
+        self.register_buffer('pos_emb', pos)   # (1, dim_tokens, h, w)
 
-    def forward(self, x):                            # x: (B, T, n_features)
-        x = self.conv(x.permute(0, 2, 1)).permute(0, 2, 1)   # → (B, T, embed_dim)
-        if self.use_pe:
-            x = x + self.pos_emb[:, :x.size(1)]
-        return self.transformer(x)
+    def forward(self, x):                      # x: (B, 256, 6, 6)
+        B, C, H, W = x.shape
+        tokens = self.proj(x)                  # (B, dim_tokens, H, W)
+        pos    = F.interpolate(self.pos_emb, size=(H, W),
+                               mode='bicubic', align_corners=False)
+        tokens = (tokens + pos).flatten(2).transpose(1, 2)  # (B, H*W, dim_tokens)
+        return tokens
 
 
 class FusionTransformer(nn.Module):
-    """CLS + concat modality sequences → 1-layer self-attention → CLS output."""
-    def __init__(self, embed_dim=40, n_heads=8, n_layers=1):
+    """
+    CLS token + concat modality token sequences → 1-layer pre-norm self-attention → CLS.
+    Matches FusionTransformer(width=512, n_heads=8, n_layers=1, fusion="concat", pool="cls").
+    """
+    def __init__(self, width=512, n_heads=8, n_layers=1):
         super().__init__()
-        self.cls_token   = nn.Parameter(torch.randn(1, 1, embed_dim))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, width))
         layer = nn.TransformerEncoderLayer(
-            d_model=embed_dim, nhead=n_heads,
-            batch_first=True, norm_first=True,
-        )
+            d_model=width, nhead=n_heads, batch_first=True, norm_first=True)
         self.transformer = nn.TransformerEncoder(layer, num_layers=n_layers)
-        self.norm        = nn.LayerNorm(embed_dim)
+        self.norm = nn.LayerNorm(width)
 
-    def forward(self, sequences):
+    def forward(self, sequences):              # sequences: list of (B, T_i, width)
         B   = sequences[0].size(0)
+        x   = torch.cat(sequences, dim=1)      # (B, sum_T, width)
         cls = self.cls_token.expand(B, -1, -1)
-        tok = torch.cat([cls] + sequences, dim=1)
-        return self.norm(self.transformer(tok)[:, 0])
+        x   = torch.cat([cls, x], dim=1)       # (B, 1+sum_T, width)
+        return self.norm(self.transformer(x)[:, 0])   # CLS token
 
 
 class TriFeaturesCoMMModel(nn.Module):
     """
-    Per-modality: ImageBackbone → CoMMEncoder
-    Fusion:       FusionTransformer (CLS) → joint classifier
-    Per-modality heads: mean-pool sequence → unimodal classifier
+    Per modality : AlexNetEncoder → PatchedInputAdapter  →  (B, 36, embed_dim)
+    Fusion       : FusionTransformer (CLS, 8 heads, 1 layer)  →  (B, embed_dim)
+    Joint head   : Linear(embed_dim, num_classes)
+    Modal heads  : Linear(mean_pool(seq), num_classes)  — for PID unimodal predictions
     """
-    def __init__(self, num_classes, embed_dim=40, cnn_channels=128,
-                 seq_len=16, positional_encoding=False):
+    def __init__(self, num_classes, embed_dim=512):
         super().__init__()
-        self.backbones = nn.ModuleList([
-            ImageBackbone(cnn_channels), ImageBackbone(cnn_channels)
+        self.encoders = nn.ModuleList([AlexNetEncoder(), AlexNetEncoder()])
+        self.adapters = nn.ModuleList([
+            PatchedInputAdapter(num_channels=256, dim_tokens=embed_dim, image_size=6),
+            PatchedInputAdapter(num_channels=256, dim_tokens=embed_dim, image_size=6),
         ])
-        self.encoders = nn.ModuleList([
-            CoMMEncoder(cnn_channels, embed_dim, seq_len,
-                        positional_encoding=positional_encoding),
-            CoMMEncoder(cnn_channels, embed_dim, seq_len,
-                        positional_encoding=positional_encoding),
-        ])
-        self.fusion    = FusionTransformer(embed_dim)
+        self.fusion    = FusionTransformer(width=embed_dim, n_heads=8, n_layers=1)
         self.head      = nn.Linear(embed_dim, num_classes)
         self.mod_heads = nn.ModuleList([nn.Linear(embed_dim, num_classes),
                                         nn.Linear(embed_dim, num_classes)])
         self.reps    = []
         self.fuseout = None
 
-    def forward(self, inputs):
-        tokens = [bb(x.float()) for bb, x in zip(self.backbones, inputs)]
-        seqs   = [enc(t) for enc, t in zip(self.encoders, tokens)]
+    def forward(self, inputs):                 # inputs: [img0, img1] (B, 3, 224, 224)
+        seqs = [adapter(enc(x.float()))
+                for enc, adapter, x in zip(self.encoders, self.adapters, inputs)]
         self.reps    = seqs
-        fused        = self.fusion(seqs)
+        fused        = self.fusion(seqs)       # (B, embed_dim)
         self.fuseout = fused
         joint_logits = self.head(fused)
         mod_logits   = [h(s.mean(dim=1)) for h, s in zip(self.mod_heads, seqs)]
@@ -837,8 +830,6 @@ if __name__ == "__main__":
     model = TriFeaturesCoMMModel(
         num_classes=NUM_CLASSES,
         embed_dim=args.embed_dim,
-        cnn_channels=args.cnn_channels,
-        seq_len=16,
     ).to(device)
     print(f"Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
