@@ -181,6 +181,27 @@ def get_dataloaders(data_root, tokenizer, bs, num_workers, img_size=224,
 # ENCODERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+class BlipVitEncoder(nn.Module):
+    """Wraps BlipVisionModel → last_hidden_state (B, T, 768)."""
+    def __init__(self, vit):
+        super().__init__()
+        self.vit = vit
+
+    def forward(self, x):
+        return self.vit(pixel_values=x).last_hidden_state
+
+
+class HFTextEncoder(nn.Module):
+    """Wraps a HuggingFace AutoModel → last_hidden_state (B, T, D)."""
+    def __init__(self, hf_model):
+        super().__init__()
+        self.model = hf_model
+
+    def forward(self, input_ids, attention_mask):
+        return self.model(input_ids=input_ids,
+                          attention_mask=attention_mask).last_hidden_state
+
+
 def build_img_encoder(name):
     if name == "resnet50":
         from torchvision.models import resnet50, ResNet50_Weights
@@ -194,16 +215,8 @@ def build_img_encoder(name):
         return m.features, 1024, True
     elif name == "blip_vit":
         from transformers import BlipVisionModel
-
-        class _BlipVitWrapper(nn.Module):
-            def __init__(self, vit):
-                super().__init__()
-                self.vit = vit
-            def forward(self, x):
-                return self.vit(pixel_values=x).last_hidden_state
-
         m = BlipVisionModel.from_pretrained("Salesforce/blip-image-captioning-base")
-        return _BlipVitWrapper(m), 768, False
+        return BlipVitEncoder(m), 768, False
     raise ValueError(name)
 
 
@@ -212,16 +225,7 @@ def build_txt_encoder(name):
            "roberta": "roberta-base",
            "deberta": "microsoft/deberta-v3-base"}
     from transformers import AutoModel
-
-    class _TextWrapper(nn.Module):
-        def __init__(self, m):
-            super().__init__()
-            self.model = m
-        def forward(self, input_ids, attention_mask):
-            return self.model(input_ids=input_ids,
-                              attention_mask=attention_mask).last_hidden_state
-
-    return _TextWrapper(AutoModel.from_pretrained(hub[name])), 768
+    return HFTextEncoder(AutoModel.from_pretrained(hub[name])), 768
 
 
 def build_tokenizer(name):
