@@ -48,7 +48,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--data-root",    default="/home/rlouiset/trifeatures_data", type=str,
                     help="Directory to store / load generated PNG images")
 parser.add_argument("--task",         default="share",
-                    choices=["share", "unique1", "unique2", "synergy"])
+                    choices=["share", "unique1", "unique2", "synergy"],
+                    help=("share: classify shared shape (redundancy baseline). "
+                          "unique1/unique2: classify the texture unique to modality 1 or 2. "
+                          "synergy: classify correlated texture×color pair (synergy task)."))
 parser.add_argument("--biased",       action="store_true",
                     help="Use biased (synergistic) dataset pairing")
 parser.add_argument("--num-classes",  default=10,  type=int,
@@ -413,6 +416,10 @@ class BimodalTrifeatures(Trifeatures):
         sel = self.rng.choice(n_allowed, size=self.max_size, replace=False)
         return allowed[sel]
 
+    def reshuffle(self):
+        """Re-sample random pairs for the next epoch (acts as data augmentation)."""
+        self.idx_pairs = self._get_idx_pairs()
+
     def __len__(self):
         return len(self.idx_pairs)
 
@@ -584,6 +591,9 @@ def train_comm(model, traindata, validdata, epochs, lr, weight_decay, save=None)
     best_val   = float("inf")
 
     for epoch in range(epochs):
+        # Re-sample pairs each epoch so the model sees fresh (i,j) combinations.
+        if hasattr(traindata.dataset, 'reshuffle'):
+            traindata.dataset.reshuffle()
         model.train()
         total_loss = 0.; n = 0
         for m0, m1, y in traindata:
@@ -864,8 +874,7 @@ if __name__ == "__main__":
         y_train.long(), y_test.long(), y_test.long(),
         f"trifeatures_{args.task}_biased={args.biased}",
         distribution_target="categorical",
-        num_classes=NUM_CLASSES,
-        lr=1e-5
+        num_classes=NUM_CLASSES
     )
 
     results = compute_redundancy_metrics(y_pred_dict)
