@@ -490,7 +490,7 @@ class PatchedInputAdapter(nn.Module):
 
 
 class FusionTransformer(nn.Module):
-    def __init__(self, width=512, n_heads=8, n_layers=2):
+    def __init__(self, width=512, n_heads=8, n_layers=1):
         super().__init__()
         self.cls_token = nn.Parameter(torch.randn(1, 1, width))
         layer = nn.TransformerEncoderLayer(
