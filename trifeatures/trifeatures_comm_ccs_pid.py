@@ -532,7 +532,7 @@ class FusionTransformer(nn.Module):
     CLS token + concat modality token sequences → 1-layer pre-norm self-attention → CLS.
     Matches FusionTransformer(width=512, n_heads=8, n_layers=1, fusion="concat", pool="cls").
     """
-    def __init__(self, width=512, n_heads=8, n_layers=1):
+    def __init__(self, width=512, n_heads=8, n_layers=2):
         super().__init__()
         self.cls_token = nn.Parameter(torch.randn(1, 1, width))
         layer = nn.TransformerEncoderLayer(
