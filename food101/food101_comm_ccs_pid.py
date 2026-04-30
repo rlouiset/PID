@@ -75,9 +75,14 @@ parser.add_argument("--epochs",       default=20,  type=int)
 parser.add_argument("--lr",           default=1e-4, type=float)
 parser.add_argument("--weight-decay", default=1e-2, type=float)
 parser.add_argument("--saved-model",  default=None, type=str)
+parser.add_argument("--load-model",   default="/home/rlouiset/food101_model.pth", type=str,
+                    help="Path to a saved .pth model; if the file exists training is skipped")
+parser.add_argument("--mod0",         default="image", type=str)
+parser.add_argument("--mod1",         default="text",  type=str)
+parser.add_argument("--num-classes",  default=101, type=int)
 args = parser.parse_args()
 
-NUM_CLASSES = 101
+NUM_CLASSES = args.num_classes
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -557,6 +562,45 @@ def compute_redundancy_metrics(y_pred_dict):
     return results
 
 
+def compute_pointwise_pid_with_source(d, num_classes):
+    targets = d["true_labels"].long()
+    log_py  = compute_log_py(targets, num_classes)
+    pid_list = []
+
+    for j, m0, m1, npr, r_src, y, lpy in zip(
+        d["pred_joint"],
+        d["pred_modalities"][0],
+        d["pred_modalities"][1],
+        d["redundancy_pointwise_ce"],
+        d["source_redundancy_preds"],
+        targets,
+        log_py,
+    ):
+        y        = y.long()
+        joint_ce = -logp(F.softmax(j,     dim=0))[y]
+        mod0_ce  = -logp(F.softmax(m0,    dim=0))[y]
+        mod1_ce  = -logp(F.softmax(m1,    dim=0))[y]
+        red_ce   = npr
+        src_ce   = -logp(F.softmax(r_src, dim=0))[y]
+        hy       = -lpy
+
+        joint_ce = min(red_ce, joint_ce)
+        src_ce   = min(red_ce, src_ce)
+        red_ce   = min(red_ce, hy)
+        src_ce   = min(src_ce, hy)
+        mod0_ce  = max(mod0_ce, joint_ce)
+        mod1_ce  = max(mod1_ce, joint_ce)
+
+        total = hy - joint_ce
+        r_val = max(hy - red_ce, hy - src_ce)
+        u0    = hy - mod0_ce - r_val
+        u1    = hy - mod1_ce - r_val
+        s     = total - u0 - u1 - r_val
+        pid_list.append([u0, u1, r_val, s])
+
+    return np.array(pid_list)
+
+
 def normalize_pid(pid):
     pid_ = np.maximum(pid, 0)
     pid_ /= pid_.sum(axis=1, keepdims=True) + 1e-12
@@ -616,15 +660,21 @@ if __name__ == "__main__":
         freeze_encoders=args.freeze_encoders,
     ).to(device)
     total = sum(p.numel() for p in model.parameters())
-    train = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"  Parameters: {total:,}  (trainable: {train:,})")
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"  Parameters: {total:,}  (trainable: {trainable:,})")
 
-    # ========= 4. TRAIN =========
-    print("\nTraining…")
-    model = train_comm(model, traindata, valdata,
-                       epochs=args.epochs, lr=args.lr,
-                       weight_decay=args.weight_decay,
-                       save=args.saved_model)
+    # ========= 4. TRAIN or LOAD =========
+    if args.load_model and os.path.isfile(args.load_model):
+        print(f"\nLoading model from {args.load_model}…")
+        model = torch.load(args.load_model, map_location=device, weights_only=False)
+        model = model.to(device)
+        print("  Model loaded — skipping training.")
+    else:
+        print("\nTraining…")
+        model = train_comm(model, traindata, valdata,
+                           epochs=args.epochs, lr=args.lr,
+                           weight_decay=args.weight_decay,
+                           save=args.saved_model)
 
     # ========= 5. TEST =========
     print("\nTest performance:")
@@ -678,6 +728,25 @@ if __name__ == "__main__":
         d["source_redundancy_pointwise_ce"],
         targets=d["true_labels"],
         num_classes=NUM_CLASSES,
-        mod0_name="image",
-        mod1_name="text",
+        mod0_name=args.mod0,
+        mod1_name=args.mod1,
     )
+
+    # ========= 10. POINTWISE PID =========
+    pid_source = compute_pointwise_pid_with_source(d, args.num_classes)
+    print(f"\nMean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
+    print(np.mean(pid_source, axis=0))
+    print("Normalised mean:", np.mean(normalize_pid(pid_source), axis=0))
+
+    for i, pid_i in enumerate(pid_source):
+        if pid_i[0] < 0 and pid_i[1] >= 0:
+            pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3]+pid_i[0]]
+            pid_source[i] = pid_i_copy
+        if pid_i[1] < 0 and pid_i[0] >= 0:
+            pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3]+pid_i[1]]
+            pid_source[i] = pid_i_copy
+
+    print(f"\nAfter correction Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
+    print(np.mean(pid_source, axis=0))
+    pid_norm = normalize_pid(pid_source)
+    print("After correction Normalised mean:", np.mean(pid_norm, axis=0))
