@@ -593,7 +593,7 @@ def mnist(args):
     # =======================
     # 1. DATA
     # =======================
-    cutoff_sum = 6
+    cutoff_sum = 7
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
     # =======================
