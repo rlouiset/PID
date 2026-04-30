@@ -693,7 +693,7 @@ def mnist(args):
     # =======================
     # 2. TRAINING
     # =======================
-    for epoch in range(1, args.epoch + 1):
+    """for epoch in range(1, args.epoch + 1):
 
         print(f"\n===== Epoch {epoch} =====")
 
@@ -716,7 +716,7 @@ def mnist(args):
         print(
             f"Digit Acc → Img: {test_metrics['img_digit_acc']:.4f} | "
             f"Digit Acc → Aud: {test_metrics['aud_digit_acc']:.4f}"
-        )
+        )"""
 
     # =======================
     # SAVE MODEL
@@ -731,10 +731,10 @@ def mnist(args):
     # print(f"[✓] Model saved to {save_path}")
 
 
-    """checkpoint = torch.load("cnn_sum" + str(cutoff_sum) + "_model.pt", map_location=device)
+    checkpoint = torch.load("cnn_sum" + str(cutoff_sum) + "_model.pt", map_location=device)
 
     model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])"""
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     model.eval()
 
@@ -930,10 +930,10 @@ def mnist(args):
     for i, pid_i in enumerate(pid):
         if pid_i[0] < 0 and pid_i[1] >= 0:
             pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3]+pid_i[0]]
-            pid_source[i] = pid_i_copy
+            pid[i] = pid_i_copy
         if pid_i[1] < 0 and pid_i[0] >= 0:
             pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3]+pid_i[1]]
-            pid_source[i] = pid_i_copy
+            pid[i] = pid_i_copy
 
     pid_norm = normalize_pid(pid)
 
