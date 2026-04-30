@@ -583,6 +583,11 @@ def extract_representations(model, loader, device):
 
     return visual_repr, audio_repr, labels, img_labels, audio_labels
 
+def normalize_pid(pid):
+    pid_ = np.maximum(pid, 0)
+    pid_ /= pid_.sum(axis=1, keepdims=True) + 1e-12
+    return pid_
+
 def mnist(args):
 
     # =======================
@@ -801,15 +806,33 @@ def mnist(args):
     pid = torch.cat(list_pid).numpy()
     pid_labels = torch.cat(list_labels).numpy()
 
-    pid = np.maximum(pid, 0)
-    pid /= pid.sum(axis=1, keepdims=True) + 1e-12
+    pid_norm = normalize_pid(pid)
 
-    pid_l2 = pid / (np.linalg.norm(pid, axis=1, keepdims=True) + 1e-6)
-    labels_l2 = pid_labels / (np.linalg.norm(pid_labels, axis=1, keepdims=True) + 1e-6)
+    pid_l2 = pid_norm / (np.linalg.norm(pid_norm, axis=1, keepdims=True) + 1e-12)
+    labels_l2 = pid_labels / (np.linalg.norm(pid_labels, axis=1, keepdims=True) + 1e-12)
 
     sim = np.sum(pid_l2 * labels_l2, axis=1)
 
-    print("\nMean cosine similarity (LSMI):", sim.mean())
+    print("\nBefore Normalization Mean cosine similarity:", sim.mean())
+
+    for i, pid_i in enumerate(pid):
+        if pid_i[0] < 0 and pid_i[1] >= 0:
+            pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3]+pid_i[0]]
+            pid[i] = pid_i_copy
+        if pid_i[1] < 0 and pid_i[0] >= 0:
+            pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3]+pid_i[1]]
+            pid[i] = pid_i_copy
+
+    pid_norm = normalize_pid(pid)
+
+    pid_l2 = pid_norm / (np.linalg.norm(pid_norm, axis=1, keepdims=True) + 1e-12)
+    labels_l2 = pid_labels / (np.linalg.norm(pid_labels, axis=1, keepdims=True) + 1e-12)
+
+    sim = np.sum(pid_l2 * labels_l2, axis=1)
+
+    print("\nAfter Normalization Mean cosine similarity:", sim.mean())
+
+
 
 if __name__ == '__main__':
     args = config().parse_args()
