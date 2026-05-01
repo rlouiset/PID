@@ -2,26 +2,18 @@
 MM-IMDB image+text → 23-class genre prediction with CoMM + CCS PID.
 
 Dataset (Kaggle: javierurea/simplified-mm-imdb):
-  images.npz  — 'images' key, shape (N, 3, 256, 160) uint8
-  data.npy    — shape (N, 3): [idx, genre_binary_vec, movie_plot_text]
+  images.npz  — key 'images', shape (N, 3, 256, 160) uint8
+  data.npy    — shape (N, 3): [sample_idx, genre_binary_vec (23), movie_plot_text]
 
-Multi-label → single-label: rarest-active-genre strategy (balanced across 23 genres)
-Split: 70% train / 10% val / 20% test
+Multi-label → single-label: rarest-active-genre strategy
+Split: 70 % train / 10 % val / 20 % test
 
-Image encoders (--img-encoder):
-  resnet50   — torchvision ResNet-50 ImageNet-1k V2 → SpatialTokenAdapter
-  convnext   — torchvision ConvNeXt-Base ImageNet-1k V1 → SpatialTokenAdapter (default)
-  blip_vit   — Salesforce/blip-image-captioning-base → SequenceTokenAdapter
+Image encoders (--img-encoder):  resnet50 | convnext (default) | blip_vit
+Text  encoders (--txt-encoder):  bert | roberta (default) | deberta
+Fusion: CoMM FusionTransformer — CLS + concat(img_tokens, txt_tokens) → 1-layer self-attn
+PID:   CCS + Source redundancy → R, U_image, U_text, S  (global + pointwise)
 
-Text encoders (--txt-encoder):
-  bert       — bert-base-uncased
-  roberta    — roberta-base  (default, better for longer plots)
-  deberta    — microsoft/deberta-v3-base
-
-Fusion:  CoMM FusionTransformer (CLS + concat tokens → 1-layer pre-norm self-attn → CLS)
-PID:     CCS + Source redundancy → R, U_image, U_text, S  (global + pointwise)
-
-Section 11: top-5 qualitative examples per PID component (R, U_img, U_txt, S).
+Section 11: top-5 qualitative examples per PID component.
 """
 
 from __future__ import print_function
@@ -46,7 +38,7 @@ multiprocessing.set_start_method('fork', force=True)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 softmax = nn.Softmax(dim=-1)
 
-# 23 MM-IMDB genres (alphabetical — standard encoding order)
+# Standard MM-IMDB 23 genres (alphabetical encoding order)
 GENRE_NAMES = [
     'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime',
     'Documentary', 'Drama', 'Family', 'Fantasy', 'History', 'Horror',
@@ -56,44 +48,43 @@ GENRE_NAMES = [
 NUM_GENRES = len(GENRE_NAMES)
 
 
-# ─── Args ─────────────────────────────────────────────────────────────────────
+# ─── Argument parser ──────────────────────────────────────────────────────────
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data-root",       default="/Users/robinlouiset/Downloads/imdb", type=str)
-parser.add_argument("--img-size",        default=224,  type=int)
-parser.add_argument("--max-txt-len",     default=128,  type=int,
-                    help="Max tokenizer length (movie plots are long; 128+ recommended)")
+parser.add_argument("--data-root",       default="/home/rlouiset/imdb")
+parser.add_argument("--img-size",        default=224,   type=int)
+parser.add_argument("--max-txt-len",     default=128,   type=int)
 parser.add_argument("--img-encoder",     default="convnext",
                     choices=["resnet50", "convnext", "blip_vit"])
 parser.add_argument("--txt-encoder",     default="roberta",
                     choices=["bert", "roberta", "deberta"])
 parser.add_argument("--freeze-encoders", action="store_true")
-parser.add_argument("--embed-dim",       default=512,  type=int)
-parser.add_argument("--bs",             default=32,   type=int)
-parser.add_argument("--num-workers",    default=4,    type=int)
-parser.add_argument("--epochs",         default=20,   type=int)
-parser.add_argument("--lr",             default=1e-4, type=float)
-parser.add_argument("--weight-decay",   default=1e-2, type=float)
-parser.add_argument("--saved-model",    default=None, type=str,
+parser.add_argument("--embed-dim",       default=512,   type=int)
+parser.add_argument("--bs",             default=32,    type=int)
+parser.add_argument("--num-workers",    default=4,     type=int)
+parser.add_argument("--epochs",         default=20,    type=int)
+parser.add_argument("--lr",             default=1e-4,  type=float)
+parser.add_argument("--weight-decay",   default=1e-2,  type=float)
+parser.add_argument("--saved-model",    default=None,
                     help="Save best model to this path during training")
-parser.add_argument("--load-model",     default="/home/rlouiset/imdb_model.pth", type=str,
-                    help="Load pre-trained model; skip training if file exists")
-parser.add_argument("--mod0",           default="image", type=str)
-parser.add_argument("--mod1",           default="text",  type=str)
+parser.add_argument("--load-model",     default="/home/rlouiset/imdb_model.pth",
+                    help="Skip training and load from this path if the file exists")
+parser.add_argument("--mod0",           default="image")
+parser.add_argument("--mod1",           default="text")
 args = parser.parse_args()
 
 NUM_CLASSES = NUM_GENRES
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DATA LOADING & DATASET
+# DATA
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def load_imdb_data(data_root):
-    """Return (images_np uint8 NCHW, texts list[str], labels_single int64 array)."""
+    """Return (images uint8 NCHW, texts list[str], labels_single int64 array)."""
     print("Loading images.npz …")
     images_np = np.load(os.path.join(data_root, "images.npz"))["images"]  # (N,3,H,W) uint8
-    print(f"  images: {images_np.shape}  {images_np.dtype}")
+    print(f"  images : {images_np.shape}  {images_np.dtype}")
 
     print("Loading data.npy …")
     raw = np.load(os.path.join(data_root, "data.npy"), allow_pickle=True)
@@ -109,22 +100,23 @@ def load_imdb_data(data_root):
     label_vecs  = np.array(label_vecs, dtype=np.int32)   # (N, 23)
     genre_freqs = label_vecs.sum(axis=0)                  # (23,)
 
-    per_genre = {GENRE_NAMES[i]: int(genre_freqs[i]) for i in range(NUM_GENRES)}
-    print(f"  Genre frequencies: {per_genre}")
+    print("  Genre frequencies:")
+    for i, (name, cnt) in enumerate(zip(GENRE_NAMES, genre_freqs)):
+        print(f"    [{i:2d}] {name:<14s}: {cnt}")
 
-    # Multi-label → single-label via rarest-active-genre
+    # Multi-label → single-label: rarest active genre per sample
     labels_single = []
     for vec in label_vecs:
         active = np.where(vec > 0)[0]
         if len(active) == 0:
-            labels_single.append(NUM_GENRES - 1)   # 'N/A'
+            labels_single.append(NUM_GENRES - 1)           # 'N/A'
         else:
             labels_single.append(int(active[np.argmin(genre_freqs[active])]))
     labels_single = np.array(labels_single, dtype=np.int64)
 
-    counts_single = np.bincount(labels_single, minlength=NUM_GENRES)
-    print("  Single-label distribution (rarest-genre strategy):")
-    for i, c in enumerate(counts_single):
+    single_counts = np.bincount(labels_single, minlength=NUM_GENRES)
+    print("  Single-label counts after rarest-genre strategy:")
+    for i, c in enumerate(single_counts):
         if c > 0:
             print(f"    {GENRE_NAMES[i]:<14s}: {c}")
 
@@ -132,8 +124,6 @@ def load_imdb_data(data_root):
 
 
 class MMIMDBDataset(Dataset):
-    """Images from pre-loaded numpy (NCHW uint8) + tokenized movie plot text."""
-
     def __init__(self, images_np, texts, labels, indices, tokenizer,
                  max_txt_len=128, img_size=224, augment=False):
         self.images_np   = images_np
@@ -162,7 +152,7 @@ class MMIMDBDataset(Dataset):
 
     def __getitem__(self, idx):
         ri  = self.indices[idx]
-        img = Image.fromarray(self.images_np[ri].transpose(1, 2, 0))  # CHW→HWC
+        img = Image.fromarray(self.images_np[ri].transpose(1, 2, 0))  # CHW → HWC
         img = self.tf(img)
 
         enc = self.tokenizer(
@@ -201,7 +191,8 @@ def get_dataloaders(images_np, texts, labels_single, tokenizer,
     val_ds   = MMIMDBDataset(images_np, texts, labels_single, val_idx,   augment=False, **kw)
     test_ds  = MMIMDBDataset(images_np, texts, labels_single, test_idx,  augment=False, **kw)
 
-    ldr = dict(batch_size=bs, num_workers=num_workers, collate_fn=imdb_collate, pin_memory=True)
+    ldr = dict(batch_size=bs, num_workers=num_workers,
+               collate_fn=imdb_collate, pin_memory=True)
     return (
         DataLoader(train_ds, shuffle=True,  **ldr),
         DataLoader(val_ds,   shuffle=False, **ldr),
@@ -211,11 +202,10 @@ def get_dataloaders(images_np, texts, labels_single, tokenizer,
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ENCODERS  (module-level classes for pickle compatibility)
+# ENCODERS  (module-level classes required for torch.save / pickle)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class BlipVitEncoder(nn.Module):
-    """BlipVisionModel → last_hidden_state (B, T, 768)."""
     def __init__(self, vit):
         super().__init__()
         self.vit = vit
@@ -225,7 +215,6 @@ class BlipVitEncoder(nn.Module):
 
 
 class HFTextEncoder(nn.Module):
-    """HuggingFace AutoModel → last_hidden_state (B, T, D)."""
     def __init__(self, hf_model):
         super().__init__()
         self.model = hf_model
@@ -236,18 +225,17 @@ class HFTextEncoder(nn.Module):
 
 
 def build_img_encoder(name):
-    """Returns (encoder, out_dim, is_spatial_map)."""
     if name == "resnet50":
         from torchvision.models import resnet50, ResNet50_Weights
         m = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
         enc = nn.Sequential(m.conv1, m.bn1, m.relu, m.maxpool,
                             m.layer1, m.layer2, m.layer3, m.layer4)
         return enc, 2048, True
-    elif name == "convnext":
+    if name == "convnext":
         from torchvision.models import convnext_base, ConvNeXt_Base_Weights
         m = convnext_base(weights=ConvNeXt_Base_Weights.IMAGENET1K_V1)
         return m.features, 1024, True
-    elif name == "blip_vit":
+    if name == "blip_vit":
         from transformers import BlipVisionModel
         m = BlipVisionModel.from_pretrained("Salesforce/blip-image-captioning-base")
         return BlipVitEncoder(m), 768, False
@@ -271,15 +259,18 @@ def build_tokenizer(name):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TOKEN ADAPTERS + FUSION TRANSFORMER  (identical to food101 / trifeatures)
+# TOKEN ADAPTERS + FUSION TRANSFORMER
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _build_2d_sincos_posemb(h, w, embed_dim):
     assert embed_dim % 4 == 0
     pos_dim = embed_dim // 4
     omega   = 1. / (10000 ** (torch.arange(pos_dim, dtype=torch.float32) / pos_dim))
-    grid_w, grid_h = torch.meshgrid(torch.arange(w, dtype=torch.float32),
-                                     torch.arange(h, dtype=torch.float32), indexing='ij')
+    grid_w, grid_h = torch.meshgrid(
+        torch.arange(w, dtype=torch.float32),
+        torch.arange(h, dtype=torch.float32),
+        indexing='ij',
+    )
     out_w = torch.einsum('m,d->md', grid_w.reshape(-1), omega)
     out_h = torch.einsum('m,d->md', grid_h.reshape(-1), omega)
     pos   = torch.cat([torch.sin(out_w), torch.cos(out_w),
@@ -299,11 +290,11 @@ class SpatialTokenAdapter(nn.Module):
         B, C, H, W = x.shape
         tokens = self.proj(x)
         pos    = F.interpolate(self.pos_emb, size=(H, W), mode='bicubic', align_corners=False)
-        return (tokens + pos).flatten(2).transpose(1, 2)   # (B, H*W, D)
+        return (tokens + pos).flatten(2).transpose(1, 2)
 
 
 class SequenceTokenAdapter(nn.Module):
-    """(B, T, in_dim) → (B, T, embed_dim) via linear projection."""
+    """(B, T, in_dim) → (B, T, embed_dim)."""
     def __init__(self, in_dim, embed_dim):
         super().__init__()
         self.proj = nn.Linear(in_dim, embed_dim)
@@ -317,15 +308,14 @@ class FusionTransformer(nn.Module):
     def __init__(self, width=512, n_heads=8, n_layers=1):
         super().__init__()
         self.cls_token = nn.Parameter(torch.randn(1, 1, width))
-        layer = nn.TransformerEncoderLayer(d_model=width, nhead=n_heads,
-                                           batch_first=True, norm_first=True)
+        layer = nn.TransformerEncoderLayer(
+            d_model=width, nhead=n_heads, batch_first=True, norm_first=True)
         self.transformer = nn.TransformerEncoder(layer, num_layers=n_layers)
         self.norm = nn.LayerNorm(width)
 
     def forward(self, sequences):
         B = sequences[0].size(0)
-        x = torch.cat(sequences, dim=1)
-        x = torch.cat([self.cls_token.expand(B, -1, -1), x], dim=1)
+        x = torch.cat([self.cls_token.expand(B, -1, -1), torch.cat(sequences, dim=1)], dim=1)
         return self.norm(self.transformer(x)[:, 0])
 
 
@@ -348,25 +338,21 @@ class ImdbCoMMModel(nn.Module):
         self.img_adapter = (SpatialTokenAdapter(img_dim, embed_dim, image_size=7)
                             if img_spatial else SequenceTokenAdapter(img_dim, embed_dim))
         self.txt_adapter = SequenceTokenAdapter(txt_dim, embed_dim)
-
-        self.fusion    = FusionTransformer(width=embed_dim, n_heads=8, n_layers=1)
-        self.head      = nn.Linear(embed_dim, num_classes)
-        self.mod_heads = nn.ModuleList([nn.Linear(embed_dim, num_classes),
-                                        nn.Linear(embed_dim, num_classes)])
-        self.reps = []   # mean-pooled (B, D) per modality — set in forward
+        self.fusion      = FusionTransformer(width=embed_dim, n_heads=8, n_layers=1)
+        self.head        = nn.Linear(embed_dim, num_classes)
+        self.mod_heads   = nn.ModuleList([nn.Linear(embed_dim, num_classes),
+                                          nn.Linear(embed_dim, num_classes)])
+        self.reps = []   # mean-pooled (B, D) per modality — populated in forward
 
         if freeze_encoders:
             for p in self.img_encoder.parameters(): p.requires_grad = False
             for p in self.txt_encoder.parameters(): p.requires_grad = False
 
     def forward(self, imgs, input_ids, attention_mask):
-        img_feat   = self.img_encoder(imgs)
-        img_tokens = self.img_adapter(img_feat)
+        img_tokens = self.img_adapter(self.img_encoder(imgs))
+        txt_tokens = self.txt_adapter(self.txt_encoder(input_ids, attention_mask))
 
-        txt_feat   = self.txt_encoder(input_ids, attention_mask)
-        txt_tokens = self.txt_adapter(txt_feat)
-
-        self.reps = [img_tokens.mean(dim=1), txt_tokens.mean(dim=1)]  # (B, D) each
+        self.reps  = [img_tokens.mean(dim=1), txt_tokens.mean(dim=1)]
 
         fused        = self.fusion([img_tokens, txt_tokens])
         joint_logits = self.head(fused)
@@ -375,7 +361,7 @@ class ImdbCoMMModel(nn.Module):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TRAINING / TESTING / EXTRACTION
+# TRAIN / TEST / EXTRACT
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def train_comm(model, traindata, validdata, epochs, lr, weight_decay, save=None):
@@ -406,7 +392,8 @@ def train_comm(model, traindata, validdata, epochs, lr, weight_decay, save=None)
                                      msk.to(device), y.to(device))
                 joint, _, _ = model(imgs, inp, msk)
                 val_loss += criterion(joint, y).item() * len(y)
-                vn += len(y); vc += (joint.argmax(1) == y).sum().item()
+                vn += len(y)
+                vc += (joint.argmax(1) == y).sum().item()
         val_loss /= vn
         print(f"Epoch {epoch:02d}  train={total_loss/n:.4f}  "
               f"val={val_loss:.4f}  acc={vc/vn:.4f}")
@@ -434,7 +421,7 @@ def test_comm(model, testdata):
             tm0 += criterion(mod_logits[0], y).item() * len(y)
             tm1 += criterion(mod_logits[1], y).item() * len(y)
             n   += len(y)
-            pj.append(joint.cpu());      pm0.append(mod_logits[0].cpu())
+            pj.append(joint.cpu());          pm0.append(mod_logits[0].cpu())
             pm1.append(mod_logits[1].cpu()); ys.append(y.cpu())
 
     pj  = torch.cat(pj);  pm0 = torch.cat(pm0)
@@ -452,7 +439,6 @@ def test_comm(model, testdata):
 
 
 def extract_split(model, loader):
-    """Extract mean-pooled (N, embed_dim) representations per modality."""
     model.eval()
     r0, r1, tgts = [], [], []
     with torch.no_grad():
@@ -470,9 +456,9 @@ def extract_split(model, loader):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def traditional_cross_entropy_from_probs(probs, targets, eps=1e-12):
-    probs = torch.clamp(probs, min=eps, max=1.0)
+    probs = torch.clamp(probs, eps, 1.0)
     ce  = -torch.log(probs)[torch.arange(len(targets)), targets.long()].mean()
-    acc = (probs.argmax(dim=1) == targets).float().mean()
+    acc = (probs.argmax(1) == targets).float().mean()
     return acc.item(), ce.item()
 
 
@@ -483,8 +469,7 @@ def compute_log_py(targets, num_classes):
 
 
 def ce_per_sample(targets, probs, eps=1e-12):
-    probs = torch.clamp(probs, eps, 1.0)
-    return -torch.log(probs[torch.arange(len(targets)), targets.long()])
+    return -torch.log(torch.clamp(probs, eps, 1.0))[torch.arange(len(targets)), targets.long()]
 
 
 def compute_probs_and_ce(logits_list, targets):
@@ -504,8 +489,8 @@ def logp(p):
     return torch.log(torch.clamp(p, 1e-12, 1.0))
 
 
-def compute_pid_global(joint_ce, mod0_ce, mod1_ce, red_ce, src_red_ce, targets,
-                       num_classes, mod0_name="image", mod1_name="text"):
+def compute_pid_global(joint_ce, mod0_ce, mod1_ce, red_ce, src_red_ce,
+                       targets, num_classes, mod0_name="image", mod1_name="text"):
     hy = compute_entropy_from_targets(targets, num_classes)
     print(f"H(Y)={hy:.4f}  joint={joint_ce:.4f}  red={red_ce:.4f}  "
           f"src_red={src_red_ce:.4f}  {mod0_name}={mod0_ce:.4f}  "
@@ -520,7 +505,7 @@ def compute_pid_global(joint_ce, mod0_ce, mod1_ce, red_ce, src_red_ce, targets,
     mod1_ce    = min(max(mod1_ce, joint_ce), red_ce)
 
     i_total = hy - joint_ce
-    i_r     = hy - red_ce;    i_r_src = hy - src_red_ce
+    i_r     = hy - red_ce;   i_r_src = hy - src_red_ce
     i_u0    = (hy - mod0_ce) - i_r
     i_u1    = (hy - mod1_ce) - i_r
     i_s     = i_total - i_u0 - i_u1 - i_r
@@ -564,16 +549,16 @@ def compute_pointwise_pid_with_source(d, num_classes):
         joint_ce = -logp(F.softmax(j,     dim=0))[y]
         mod0_ce  = -logp(F.softmax(m0,    dim=0))[y]
         mod1_ce  = -logp(F.softmax(m1,    dim=0))[y]
-        red_ce   = npr
+        red_ce   = float(npr)
         src_ce   = -logp(F.softmax(r_src, dim=0))[y]
-        hy       = -lpy
+        hy       = float(-lpy)
 
-        joint_ce = min(red_ce, joint_ce)
-        src_ce   = min(red_ce, src_ce)
+        joint_ce = min(red_ce, float(joint_ce))
+        src_ce   = min(red_ce, float(src_ce))
         red_ce   = min(red_ce, hy)
         src_ce   = min(src_ce, hy)
-        mod0_ce  = max(mod0_ce, joint_ce)
-        mod1_ce  = max(mod1_ce, joint_ce)
+        mod0_ce  = max(float(mod0_ce), joint_ce)
+        mod1_ce  = max(float(mod1_ce), joint_ce)
 
         total = hy - joint_ce
         r_val = max(hy - red_ce, hy - src_ce)
@@ -619,11 +604,11 @@ if __name__ == "__main__":
     print(f"  Device        : {device}")
     print(f"{'='*60}\n")
 
-    # ========= 1. TOKENIZER =========
+    # ── 1. Tokenizer ──────────────────────────────────────────────────────────
     print("Loading tokenizer…")
     tokenizer = build_tokenizer(args.txt_encoder)
 
-    # ========= 2. DATA =========
+    # ── 2. Data ───────────────────────────────────────────────────────────────
     print("\nLoading data…")
     images_np, texts, labels_single = load_imdb_data(args.data_root)
 
@@ -632,12 +617,11 @@ if __name__ == "__main__":
         bs=args.bs, num_workers=args.num_workers,
         img_size=args.img_size, max_txt_len=args.max_txt_len,
     )
-    test_texts  = [texts[i]         for i in test_idx]
-    test_labels = labels_single[test_idx]               # int64 array (N_test,)
-
+    test_texts  = [texts[i]          for i in test_idx]   # raw strings for display
+    test_labels = labels_single[test_idx]                  # int64 (N_test,)
     print(f"\n  train={len(train_idx)}  val={len(val_idx)}  test={len(test_idx)}")
 
-    # ========= 3. MODEL =========
+    # ── 3. Model ──────────────────────────────────────────────────────────────
     print("\nBuilding model…")
     model = ImdbCoMMModel(
         num_classes=NUM_CLASSES,
@@ -650,7 +634,7 @@ if __name__ == "__main__":
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"  Parameters: {total:,}  (trainable: {trainable:,})")
 
-    # ========= 4. TRAIN OR LOAD =========
+    # ── 4. Train or load ──────────────────────────────────────────────────────
     if args.load_model and os.path.isfile(args.load_model):
         print(f"\nLoading model from {args.load_model}…")
         model = torch.load(args.load_model, map_location=device, weights_only=False)
@@ -663,12 +647,12 @@ if __name__ == "__main__":
                            weight_decay=args.weight_decay,
                            save=args.saved_model)
 
-    # ========= 5. TEST =========
+    # ── 5. Test ───────────────────────────────────────────────────────────────
     print("\nTest performance:")
     d = test_comm(model, testdata)
     print_model_metrics(d)
 
-    # ========= 6. EXTRACT REPRESENTATIONS =========
+    # ── 6. Extract representations ────────────────────────────────────────────
     print("\nExtracting representations…")
     X_train, y_train = extract_split(model, traindata)
     X_val,   y_val   = extract_split(model, valdata)
@@ -676,7 +660,7 @@ if __name__ == "__main__":
     print(f"  embed_dim={X_train['modality0'].shape[1]}  "
           f"train={len(y_train)}  val={len(y_val)}  test={len(y_test)}")
 
-    # ========= 7. CCS REDUNDANCY =========
+    # ── 7. CCS redundancy ─────────────────────────────────────────────────────
     targets = d["true_labels"].long()
     log_py  = compute_log_py(targets, NUM_CLASSES)
     _, ce_list = compute_probs_and_ce(d["pred_modalities"], targets)
@@ -689,7 +673,7 @@ if __name__ == "__main__":
     d["redundancy_ce"]           = ccs.mean().item()
     d["redundancy_pointwise_ce"] = ccs.numpy()
 
-    # ========= 8. SOURCE REDUNDANCY =========
+    # ── 8. Source redundancy ──────────────────────────────────────────────────
     print("\nFitting source redundancy model…")
     y_pred_dict = return_redundancy_test_performances(
         X_train, X_val, X_test,
@@ -698,14 +682,13 @@ if __name__ == "__main__":
         distribution_target="categorical",
         num_classes=NUM_CLASSES,
     )
-
     results = compute_redundancy_metrics(y_pred_dict)
     print_redundancy_metrics(results)
 
     d["source_redundancy_pointwise_ce"] = results["average"]["cross_entropy"]
     d["source_redundancy_preds"]        = y_pred_dict["average"]
 
-    # ========= 9. GLOBAL PID =========
+    # ── 9. Global PID ─────────────────────────────────────────────────────────
     print("\nGlobal PID:")
     compute_pid_global(
         d["joint_ce"],
@@ -719,9 +702,9 @@ if __name__ == "__main__":
         mod1_name=args.mod1,
     )
 
-    # ========= 10. POINTWISE PID + CORRECTION =========
+    # ── 10. Pointwise PID + correction loop ───────────────────────────────────
     pid_source = compute_pointwise_pid_with_source(d, NUM_CLASSES)
-    print(f"\nMean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
+    print(f"\nMean pointwise PID  [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid_source, axis=0))
     print("Normalised mean:", np.mean(normalize_pid(pid_source), axis=0))
 
@@ -731,23 +714,25 @@ if __name__ == "__main__":
         if pid_i[1] < 0 and pid_i[0] >= 0:
             pid_source[i] = [pid_i[0], 0, pid_i[2], pid_i[3] + pid_i[1]]
 
-    print(f"\nAfter correction  Mean pointwise PID [U_{args.mod0}, U_{args.mod1}, R, S]:")
+    print(f"\nAfter correction  Mean pointwise PID  [U_{args.mod0}, U_{args.mod1}, R, S]:")
     print(np.mean(pid_source, axis=0))
     pid_norm = normalize_pid(pid_source)
     print("After correction  Normalised mean:", np.mean(pid_norm, axis=0))
 
-    # ========= 11. TOP-5 QUALITATIVE EXAMPLES PER PID COMPONENT =========
-    print(f"\n{'='*70}")
-    print("Top-5 qualitative examples per PID component (normalised %)")
-    print(f"{'='*70}")
-    # pid columns: 0=U_img, 1=U_txt, 2=R, 3=S
-    component_names = [f"U_{args.mod0} (unique to image)",
-                       f"U_{args.mod1} (unique to text)",
-                       "R (redundancy)",
-                       "S (synergy)"]
-    col_labels = [args.mod0, args.mod1, "R", "S"]
+    # ── 11. Top-5 qualitative examples per PID component ──────────────────────
+    # pid_norm columns: 0 = U_img, 1 = U_txt, 2 = R, 3 = S
+    component_names = [
+        f"U_{args.mod0}  (unique to image)",
+        f"U_{args.mod1}  (unique to text)",
+        "R  (redundancy)",
+        "S  (synergy)",
+    ]
 
-    for col, (cname, clabel) in enumerate(zip(component_names, col_labels)):
+    print(f"\n{'='*70}")
+    print("Top-5 qualitative examples per PID component (by normalised %)")
+    print(f"{'='*70}")
+
+    for col, cname in enumerate(component_names):
         top5 = np.argsort(pid_norm[:, col])[-5:][::-1]
         print(f"\n{'─'*60}")
         print(f"  {cname}")
