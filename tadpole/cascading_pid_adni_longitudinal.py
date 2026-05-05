@@ -41,20 +41,28 @@ def MI_from_r2(r2):
 def nats_to_r2(I_nats):
     return 1.0 - np.exp(-2.0 * max(0.0, I_nats))
 
-def pid_nats_to_r2(R, U_old, U_new, S, R2_joint):
-    r2_R = nats_to_r2(R)
-    r2_U_old = nats_to_r2(U_old)
-    r2_U_new = nats_to_r2(U_new)
-    r2_S = nats_to_r2(S)
+def pid_nats_to_r2(R_nats, r2_old, r2_new, r2_joint, R_source_nats=None):
+    R_nats_c   = max(0.0, R_nats)
+    r2_R       = 1.0 - np.exp(-2.0 * R_nats_c)
+    r2_U_old   = r2_old - r2_R
+    r2_U_new   = r2_new - r2_R
+    r2_S       = r2_joint - r2_R - r2_U_old - r2_U_new
+
     raw_sum = r2_R + r2_U_old + r2_U_new + r2_S
-    if raw_sum > 1e-12:
-        scale = R2_joint / raw_sum
-        r2_R *= scale; r2_U_old *= scale
-        r2_U_new *= scale; r2_S *= scale
+    scale   = (r2_joint / raw_sum) if abs(raw_sum) > 1e-12 else 1.0
+    r2_R     *= scale
+    r2_U_old *= scale
+    r2_U_new *= scale
+    r2_S     *= scale
+
+    R_src = min(max(0.0, R_source_nats if R_source_nats is not None else 0.0), R_nats_c)
+    r2_R_source = (1.0 - np.exp(-2.0 * R_src)) * scale
+    r2_R_mech   = (np.exp(-2.0 * R_src) - np.exp(-2.0 * R_nats_c)) * scale
+
     return {
-        "r2_R": r2_R, "r2_U_old": r2_U_old,
-        "r2_U_new": r2_U_new, "r2_S": r2_S,
-        "r2_unexplained": 1.0 - R2_joint,
+        "r2_R": r2_R, "r2_U_old": r2_U_old, "r2_U_new": r2_U_new, "r2_S": r2_S,
+        "r2_R_source": r2_R_source, "r2_R_mech": r2_R_mech,
+        "r2_unexplained": 1.0 - r2_joint,
     }
 
 def pointwise_info(y, y_pred, var_y, y_bar, mse):
@@ -402,7 +410,6 @@ def train_gk(Xa_tr, Xb_tr, y_tr, Xa_va, Xb_va, y_va,
     var_y = np.var(y_te); y_bar = np.mean(y_te)
     mse_a = mean_squared_error(y_te, pred_a)
     mse_b = mean_squared_error(y_te, pred_b)
-
     i_a = pointwise_info(y_te, pred_a, var_y, y_bar, mse_a)
     i_b = pointwise_info(y_te, pred_b, var_y, y_bar, mse_b)
     both_pos = (i_a > 0) & (i_b > 0)
@@ -434,7 +441,7 @@ def run_cascade(splits, modalities, device="cpu"):
     )
     r2_base = max(0.0, r2_score(y_te, pred_base))
     I_base = MI_from_r2(r2_base)
-    ve_base = pid_nats_to_r2(0, I_base, 0, 0, r2_base)
+    ve_base = pid_nats_to_r2(0.0, r2_base, 0.0, r2_base)
     print(f"  R² = {r2_base:.4f},  I = {I_base:.4f} nats")
 
     results = [{
@@ -503,14 +510,23 @@ def run_cascade(splits, modalities, device="cpu"):
         R_total_nats = max(pid["R"], R_source_nats)
         R_total_nats = min(R_total_nats, pid["I_old"], pid["I_new"])
         R_source_nats = min(R_source_nats, R_total_nats)
+
+        U_old_nats = pid["I_old"] - R_total_nats
+        U_new_nats = pid["I_new"] - R_total_nats
+        S_nats     = pid["I_joint"] - pid["I_old"] - pid["I_new"] + R_total_nats
+
+        if S_nats < 0:
+            R_total_nats  -= S_nats
+            R_source_nats -= S_nats
+            R_source_nats  = min(R_source_nats, R_total_nats)
+            U_old_nats = pid["I_old"] - R_total_nats
+            U_new_nats = pid["I_new"] - R_total_nats
+            S_nats = 0.0
+
         R_mech_nats = max(0.0, R_total_nats - R_source_nats)
-        U_old_nats, U_new_nats, S_nats = pid["U_old"], pid["U_new"], pid["S"]
         I_joint, R2_joint = pid["I_joint"], pid["R2_joint"]
 
-        ve = pid_nats_to_r2(R_total_nats, U_old_nats, U_new_nats, S_nats, R2_joint)
-        source_frac = R_source_nats / R_total_nats if R_total_nats > 1e-12 else 0.0
-        r2_R_source = ve["r2_R"] * source_frac
-        r2_R_mech = ve["r2_R"] * (1.0 - source_frac)
+        ve = pid_nats_to_r2(R_total_nats, pid["R2_old"], pid["R2_new"], R2_joint, R_source_nats)
 
         print(f"\n  R²_old   = {pid['R2_old']:.4f}  ({', '.join(accumulated[:-1])})")
         print(f"  R²_new   = {pid['R2_new']:.4f}  ({best_mod})")
@@ -521,7 +537,7 @@ def run_cascade(splits, modalities, device="cpu"):
         print(f"    U_new   = {U_new_nats:.4f}")
         print(f"    S       = {S_nats:.4f}")
         print(f"\n  PID as fraction of Var(Y):")
-        print(f"    R       = {ve['r2_R']:.4f}  [src: {r2_R_source:.4f}, mech: {r2_R_mech:.4f}]")
+        print(f"    R       = {ve['r2_R']:.4f}  [src: {ve['r2_R_source']:.4f}, mech: {ve['r2_R_mech']:.4f}]")
         print(f"    U_old   = {ve['r2_U_old']:.4f}")
         print(f"    U_new   = {ve['r2_U_new']:.4f}")
         print(f"    S       = {ve['r2_S']:.4f}")
@@ -536,7 +552,7 @@ def run_cascade(splits, modalities, device="cpu"):
             "R_source_nats": R_source_nats, "R_mech_nats": R_mech_nats,
             "r2_R": ve["r2_R"], "r2_U_old": ve["r2_U_old"],
             "r2_U_new": ve["r2_U_new"], "r2_S": ve["r2_S"],
-            "r2_R_source": r2_R_source, "r2_R_mech": r2_R_mech,
+            "r2_R_source": ve["r2_R_source"], "r2_R_mech": ve["r2_R_mech"],
             "r2_unexplained": ve["r2_unexplained"],
         })
 

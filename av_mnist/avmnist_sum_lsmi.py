@@ -1,856 +1,482 @@
-""" Adapted from https://github.com/pytorch/examples/blob/main/mnist/main.py """
+"""LSMI PID on representations learned by the AV-MNIST multimodal model.
+
+Same CNN_sum model, AV_dataset_sum, and training protocol as avmnist_sum_update.py.
+LSMI discriminators and entropy estimators are trained on the representations
+extracted from the trained multimodal encoder, not on the raw inputs.
+"""
 from __future__ import print_function
 import argparse
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from model import CNN_sum
 from dataset import AV_dataset_sum
+from utils import TARGET_FRAMES, softmax, traditional_cross_entropy_from_probs
 
-import torch
-import torch.nn.functional as F
 from torchaudio.transforms import MelSpectrogram, AmplitudeToDB
 from torchvision.transforms import Compose
-
+from torchfsdd import TorchFSDDGenerator, TrimSilence
 from math import *
 
-TARGET_FRAMES = 64
-
-softmax = torch.nn.Softmax(dim=-1)
-
-import argparse
-import pickle
-import torch
-import numpy as np
-
-from utils_lsmi import MargKernel, cls_network
-from utils_lsmi import get_loader, setup_seed
-
-from torchfsdd import TorchFSDDGenerator, TrimSilence
-from torchaudio.transforms import MFCC
-from torchvision.transforms import Compose, Resize
-
-
-def RUS_adjustment(rus):
-    """
-    Adjusts the input tensors (r, u1, u2, s) while preserving certain sums
-    and the original device of the tensors. The adjustment aims to make the
-    means of these components non-negative based on a specific priority:
-
-    1. If the mean of 'r' (R_mean) or 's' (S_mean) is negative, an adjustment
-       factor is calculated to make both R_mean and S_mean non-negative.
-       This adjustment might consequently alter the means of 'u1' (U1_mean)
-       and 'u2' (U2_mean), potentially making them negative.
-
-    2. If R_mean and S_mean are already non-negative, but U1_mean or U2_mean
-       is negative, the adjustment factor is calculated to make both U1_mean
-       and U2_mean non-negative. This adjustment might, in turn, make
-       R_mean or S_mean negative if they were small positive values.
-
-    The adjustment maintains the following sum properties for the means:
-    - (R_mean + U1_mean + U2_mean + S_mean) remains unchanged.
-    - (R_mean + U1_mean) remains unchanged.
-    - (R_mean + U2_mean) remains unchanged.
-
-    Args:
-        rus (tuple or list): A collection of four PyTorch tensors (r, u1, u2, s).
-
-    Returns:
-        tuple: A tuple of four adjusted PyTorch tensors (r_adjusted, u1_adjusted,
-               u2_adjusted, s_adjusted), on the same device as the input tensors.
-    """
-    r_orig, u_1_orig, u_2_orig, s_orig = rus
-
-    R_mean = r_orig.detach().mean()
-    U1_mean = u_1_orig.detach().mean()
-    U2_mean = u_2_orig.detach().mean()
-    S_mean = s_orig.detach().mean()
-
-    adj_factor = torch.tensor(0.0, dtype=R_mean.dtype, device=R_mean.device)
-
-    # Priority 1: Address negative mean of r or s
-    if R_mean < 0 or S_mean < 0:
-        adj_factor = -torch.min(R_mean, S_mean)
-
-    # Priority 2: If means of r and s are non-negative, address negative mean of u1 or u2
-    elif U1_mean < 0 or U2_mean < 0:
-        adj_factor = torch.min(U1_mean, U2_mean)
-
-    r_adjusted = r_orig + adj_factor
-    u_1_adjusted = u_1_orig - adj_factor
-    u_2_adjusted = u_2_orig - adj_factor
-    s_adjusted = s_orig + adj_factor
-
-    return r_adjusted, u_1_adjusted, u_2_adjusted, s_adjusted
-
-
-def obtain_feature_input(batch, device):
-    modal_1 = batch[0].to(device)
-    modal_2 = batch[1].to(device)
-    labels = batch[2].to(device)
-    return modal_1, modal_2, labels
-
-
-def get_entropy(dataloader, model, modality='modality_1', cfg=None):
-    model.eval()
-    info = []
-    with torch.no_grad():
-        losses = 0.0
-        for batch in dataloader:
-            modal_1, modal_2, _ = obtain_feature_input(batch, device=cfg.device)
-            if modality == "modality_1":
-                input_data = modal_1
-            elif modality == "modality_2":
-                input_data = modal_2
-            batch_size = input_data.shape[0]
-            loss = model(input_data)
-            info.append(loss)
-            losses = losses + torch.mean(loss).item() * batch_size
-    info = torch.cat(info, dim=0).detach()
-    return info
-
-
-def get_mutual_info(dataloader, model, modality='modality_1', cfg=None):
-    model.eval()
-    info = []
-    with torch.no_grad():
-        infos = 0.0
-        for batch in dataloader:
-            modal_1, modal_2, labels = obtain_feature_input(batch, device=cfg.device)
-            if modality == "modality_1":
-                input_data = modal_1
-            elif modality == "modality_2":
-                input_data = modal_2
-            elif modality == "modality_12":
-                input_data = torch.cat([modal_1, modal_2], dim=1)
-            batch_size = input_data.shape[0]
-            rows = torch.arange(batch_size)
-            out = model(input_data)
-            info_cur = np.log(cfg.n_classes) + torch.nn.Softmax(dim=1)(out)[rows, labels].log()
-            info.append(info_cur)
-            infos = infos + torch.mean(info_cur).item() * batch_size
-    info = torch.cat(info, dim=0).detach()
-    return info
-
-
-def LSMI_estimation(dataloader, discriminator, entropy_estimator, cfg=None):
-    I_X1Y = get_mutual_info(dataloader, discriminator[0], modality='modality_1', cfg=cfg)
-    I_X2Y = get_mutual_info(dataloader, discriminator[1], modality='modality_2', cfg=cfg)
-    I_X1X2Y = get_mutual_info(dataloader, discriminator[2], modality='modality_12', cfg=cfg)
-    H_X1 = get_entropy(dataloader, entropy_estimator[0], modality='modality_1', cfg=cfg)
-    H_X2 = get_entropy(dataloader, entropy_estimator[1], modality='modality_2', cfg=cfg)
-
-    r_plus = torch.minimum(H_X1, H_X2)
-    r_minus = torch.minimum(H_X1 - I_X1Y, H_X2 - I_X2Y)
-
-    r = r_plus - r_minus
-    u_1 = I_X1Y - r
-    u_2 = I_X2Y - r
-    s = I_X1X2Y - r - u_1 - u_2
-    r_adjusted, u_1_adjusted, u_2_adjusted, s_adjusted = RUS_adjustment([r, u_1, u_2, s])
-
-    R = torch.mean(r_adjusted)
-    U_1 = torch.mean(u_1_adjusted)
-    U_2 = torch.mean(u_2_adjusted)
-    S = torch.mean(s_adjusted)
-
-    print(f"R: {R.item():.4f}, U1: {U_1.item():.4f}, U2: {U_2.item():.4f}, S: {S.item():.4f}")
-
-    return r, u_1, u_2, s
-
-
-def obtain_discriminator(cfg, train_loader):
-    model_1 = cls_network(input_dim=cfg.input_size_1, hidden_dim=cfg.embed_size, output_dim=cfg.n_classes).to(
-        cfg.device)
-    model_2 = cls_network(input_dim=cfg.input_size_2, hidden_dim=cfg.embed_size, output_dim=cfg.n_classes).to(
-        cfg.device)
-    model_j = cls_network(input_dim=cfg.input_size_1 + cfg.input_size_2, hidden_dim=cfg.embed_size,
-                          output_dim=cfg.n_classes).to(cfg.device)
-    models = [model_1, model_2, model_j]
-    optimizer = torch.optim.Adam([p for model in models for p in model.parameters()], lr=1e-3)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.1)
-    criterion = torch.nn.CrossEntropyLoss()
-    num_epochs = cfg.num_epochs_discriminator
-    for epoch in range(num_epochs):
-        losses = 0.0
-        num_samples = 0
-        for batch in train_loader:
-            modal_1, modal_2, labels = obtain_feature_input(batch, device=cfg.device)
-            batch_size = modal_1.shape[0]
-            out_1 = models[0](modal_1)
-            out_2 = models[1](modal_2)
-            out_j = models[2](torch.cat([modal_1, modal_2], dim=1))
-            optimizer.zero_grad()
-            loss_1 = criterion(out_1, labels)
-            loss_2 = criterion(out_2, labels)
-            loss_j = criterion(out_j, labels)
-            loss = loss_1 + loss_2 + loss_j
-            loss.backward()
-            optimizer.step()
-            losses += loss.item() * batch_size
-            num_samples += batch_size
-        scheduler.step()
-        if (epoch + 1) % 5 == 0:
-            print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {losses / num_samples:.4f}')
-
-    return models
-
-
-def obtain_entropy_estimator(cfg, train_loader):
-    model_1 = MargKernel(dim=cfg.input_size_1).to(cfg.device)
-    model_2 = MargKernel(dim=cfg.input_size_2).to(cfg.device)
-    models = [model_1, model_2]
-    optimizer = torch.optim.Adam([p for model in models for p in model.parameters()], lr=1e-3)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
-    num_epochs = cfg.num_epochs_entropy_estimator
-    for epoch in range(num_epochs):
-        for model in models:
-            model.train()
-        losses = 0.0
-        for batch in train_loader:
-            modal_1, modal_2, _ = obtain_feature_input(batch, device=cfg.device)
-            batch_size = modal_1.shape[0]
-            loss_1 = model_1(modal_1)
-            loss_2 = model_2(modal_2)
-            loss = loss_1 + loss_2
-            loss.backward()
-            optimizer.step()
-            losses += loss.item() * batch_size
-        scheduler.step()
-        if (epoch + 1) % 5 == 0:
-            print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {losses / len(train_loader.dataset):.4f}')
-
-    return models
-
-
-def estimation_main(cfg, feature_dir=None):
-    train_loader, val_loader = get_loader(cfg, feature_dir)
-    discriminator = obtain_discriminator(cfg, train_loader=train_loader)
-    entropy_estimator = obtain_entropy_estimator(cfg, train_loader=train_loader)
-    LSMI_estimation(train_loader, discriminator, entropy_estimator, cfg)
-    LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
-
-def pad_or_crop(spec):
-    n_mels, T = spec.shape
-
-    if T > TARGET_FRAMES:
-        # random crop instead of left crop
-        start = np.random.randint(0, T - TARGET_FRAMES + 1)
-        spec = spec[:, start:start + TARGET_FRAMES]
-
-    elif T < TARGET_FRAMES:
-        pad = TARGET_FRAMES - T
-        left = pad // 2
-        right = pad - left
-        spec = F.pad(spec, (left, right))
-
-    return spec
-
-def traditional_cross_entropy_from_probs(probs, targets, eps=1e-12):
-    probs = torch.clamp(probs, min=eps, max=1.0)
-    log_probs = torch.log(probs)
-
-    ce = -log_probs[torch.arange(targets.shape[0]), targets.long()].mean()
-    acc = (probs.argmax(dim=1) == targets).float().mean()
-
-    return acc.item(), ce.item()
-
+from utils_lsmi import MargKernel, cls_network, get_loader, setup_seed
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
 
+# ─── Config ───────────────────────────────────────────────────────────────────
+
 def config():
-    parser = argparse.ArgumentParser(description='Pytorch audiovisual MNIST digit classification')
-    parser.add_argument('--model', type=str, default='CNN', help='FCN or CNN')
-    parser.add_argument('--batch-size', type=int, default=1024, metavar='N', help='input batch size for training')
-    parser.add_argument('--test-batch-size', type=int, default=1024, metavar='N', help='input batch size for testing')
-    parser.add_argument('--epoch', type=int, default=50, metavar='N', help='number of epochs to train')
-    parser.add_argument('--lr', type=float, default=0.001, metavar='LR', help='learning rate')
-    parser.add_argument('--gamma', type=float, default=0.996, metavar='M', help='Learning rate step gamma=')
-    parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed')
-    parser.add_argument('--log-interval', type=int, default=30, metavar='N',
-                        help='how many batches to wait before logging training status')
-    parser.add_argument('--save-model', action='store_true', default=False, help='For Saving the current Model')
-    parser.add_argument("--depth", type=int, default=6, help='number of layers ')
-    parser.add_argument("--fuse_depth", type=int, default=2, help='fuse at which layer')
+    parser = argparse.ArgumentParser(description='AV-MNIST LSMI PID on learned representations')
+    parser.add_argument('--batch-size',      type=int,   default=1024)
+    parser.add_argument('--test-batch-size', type=int,   default=1024)
+    parser.add_argument('--epoch',           type=int,   default=50)
+    parser.add_argument('--lr',              type=float, default=0.001)
+    parser.add_argument('--gamma',           type=float, default=0.996)
+    parser.add_argument('--seed',            type=int,   default=1)
+    parser.add_argument('--log-interval',    type=int,   default=30)
+    parser.add_argument('--save-model',      action='store_true', default=False)
+    parser.add_argument('--depth',           type=int,   default=6)
+    parser.add_argument('--fuse_depth',      type=int,   default=2)
     print(parser.parse_args(), '\n')
     return parser
 
+
+# ─── Audio / image transforms ─────────────────────────────────────────────────
+
+def pad_or_crop(spec):
+    n_mels, T = spec.shape
+    if T > TARGET_FRAMES:
+        start = np.random.randint(0, T - TARGET_FRAMES + 1)
+        return spec[:, start:start + TARGET_FRAMES]
+    if T < TARGET_FRAMES:
+        pad = TARGET_FRAMES - T
+        return F.pad(spec, (pad // 2, pad - pad // 2))
+    return spec
+
+
 def normalize_spec(spec):
-    mean = spec.mean()
-    std = spec.std() + 1e-6
-    return (spec - mean) / std
+    return (spec - spec.mean()) / (spec.std() + 1e-6)
+
 
 def add_noise(spec, noise_level=0.05):
-    noise = torch.randn_like(spec) * noise_level
-    return spec + noise
+    return spec + torch.randn_like(spec) * noise_level
+
 
 def freq_mask(spec, max_width=8):
     spec = spec.clone()
-
-    Freq, _ = spec.shape
-    width = np.random.randint(0, max_width)
-    start = np.random.randint(0, max(1, Freq - width))
-
-    spec[start:start+width, :] = 0
+    F_, _ = spec.shape
+    w = np.random.randint(0, max_width)
+    s = np.random.randint(0, max(1, F_ - w))
+    spec[s:s + w, :] = 0
     return spec
+
 
 def time_mask(spec, max_width=10):
     _, T = spec.shape
-
-    width = np.random.randint(0, max_width)
-    start = np.random.randint(0, max(1, T - width))
-
-    spec[:, start:start+width] = 0
+    w = np.random.randint(0, max_width)
+    s = np.random.randint(0, max(1, T - w))
+    spec[:, s:s + w] = 0
     return spec
+
 
 def augment(spec):
     if np.random.rand() < 0.8:
         spec = add_noise(spec)
-
     if np.random.rand() < 0.5:
         spec = freq_mask(spec)
-
     if np.random.rand() < 0.5:
         spec = time_mask(spec)
-
     return spec
+
 
 def get_audio_transforms(train=True):
     base = [
         TrimSilence(threshold=1e-6),
-
-        MelSpectrogram(
-            sample_rate=8000,
-            n_mels=64,
-            n_fft=512,
-            hop_length=128
-        ),
-
+        MelSpectrogram(sample_rate=8000, n_mels=64, n_fft=512, hop_length=128),
         AmplitudeToDB(),
-
         pad_or_crop,
     ]
-
     if train:
-        base += [
-            augment,
-        ]
-
-    base += [normalize_spec]
-
+        base.append(augment)
+    base.append(normalize_spec)
     return Compose(base)
+
 
 def get_image_transforms(train=True):
     base = []
-
     if train:
-        base += [
-            transforms.RandomAffine(
-                degrees=10,
-                translate=(0.1, 0.1),
-                scale=(0.9, 1.1)
-            ),
-        ]
-
-    base += [
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ]
-
+        base.append(transforms.RandomAffine(degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1)))
+    base += [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     return transforms.Compose(base)
 
+
 def load_fsdd():
-
-    train_transforms = get_audio_transforms(train=True)
-    test_transforms = get_audio_transforms(train=False)
-
+    train_tf = get_audio_transforms(train=True)
+    test_tf  = get_audio_transforms(train=False)
     fsdd_train = TorchFSDDGenerator(
         version='local',
         path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
-        transforms=train_transforms,
-        load_all=True
+        transforms=train_tf, load_all=True,
     )
-
     fsdd_test = TorchFSDDGenerator(
         version='local',
         path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
-        transforms=test_transforms,
-        load_all=True
+        transforms=test_tf, load_all=True,
     )
-
     train_set, _ = fsdd_train.train_test_split(test_size=0.15)
-    _, test_set = fsdd_test.train_test_split(test_size=0.15)
-
+    _,  test_set = fsdd_test.train_test_split(test_size=0.15)
     return train_set, test_set
 
+
 def prepare_dataset(args, cutoff_sum):
+    kw_tr = {'batch_size': args.batch_size,      'shuffle': True,
+             'num_workers': 0, 'pin_memory': True, 'drop_last': False}
+    kw_te = {'batch_size': args.test_batch_size, 'shuffle': False,
+             'num_workers': 0, 'pin_memory': True, 'drop_last': False}
 
-    train_kwargs = {'batch_size': args.batch_size, 'shuffle': True}
-    test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': False}
-
-    cuda_kwargs = {
-        'num_workers': 0,
-        'pin_memory': True,
-        'drop_last': False
-    }
-
-    train_kwargs.update(cuda_kwargs)
-    test_kwargs.update(cuda_kwargs)
-
-    # separate transforms
-    v_train = datasets.MNIST(
-        'data',
-        train=True,
-        download=True,
-        transform=get_image_transforms(train=True)
-    )
-
-    v_test = datasets.MNIST(
-        'data',
-        train=False,
-        transform=get_image_transforms(train=False)
-    )
-
+    v_train = datasets.MNIST('data', train=True,  download=True,
+                             transform=get_image_transforms(train=True))
+    v_test  = datasets.MNIST('data', train=False,
+                             transform=get_image_transforms(train=False))
     a_train, a_test = load_fsdd()
 
-    AV_trainset = AV_dataset_sum(
-        v_train, a_train, cutoff_sum,
-        samples_per_combination=30
-    )
-
-    AV_testset = AV_dataset_sum(
-        v_test, a_test, cutoff_sum,
-        samples_per_combination=10
-    )
-
-    AV_train = DataLoader(AV_trainset, **train_kwargs)
-    AV_test = DataLoader(AV_testset, **test_kwargs)
-
+    AV_train = DataLoader(AV_dataset_sum(v_train, a_train, cutoff_sum,
+                                         samples_per_combination=30), **kw_tr)
+    AV_test  = DataLoader(AV_dataset_sum(v_test,  a_test,  cutoff_sum,
+                                         samples_per_combination=10),  **kw_te)
     return AV_train, AV_test
 
-def train(args, model, device, train_loader, optimizer, epoch):
-    model.train()
-    for batch_idx, (imgs, audios, labels, labels_img, labels_aud) in enumerate(train_loader):
-        imgs, audios, labels = imgs.to(device), audios.to(device), labels.to(device)
-        labels_img, labels_aud = labels_img.to(device), labels_aud.to(device)
-        optimizer.zero_grad()
-        output, output_img, output_aud, output_digit_img, output_digit_aud = model.forward(imgs, audios,
-                                                                                           unimodal="train")
-        loss = F.nll_loss(output_digit_img, labels_img)
-        loss += F.nll_loss(output_digit_aud, labels_aud)
 
-        print("img digit acc:", (output_digit_img.argmax(1) == labels_img).float().mean())
-        print("aud digit acc:", (output_digit_aud.argmax(1) == labels_aud).float().mean())
-        print("fusion acc:", (output.argmax(1) == labels).float().mean())
-        print('---')
+# ─── Model eval helpers ───────────────────────────────────────────────────────
 
-        if epoch > 25:
-            loss += F.nll_loss(output, labels)
-            loss += F.nll_loss(output_img, labels)
-            loss += F.nll_loss(output_aud, labels)
-        if batch_idx == 0:
-            Ls = loss.item()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(imgs), len(train_loader.dataset),
-                       100. * batch_idx / len(train_loader), loss.item()))
-        loss.backward()
-        optimizer.step()
-    return Ls
-
-def test_unit(model, device, loader, unimodal=None):
-
+def test_unit(model, loader, unimodal=None):
     model.eval()
-
-    total_acc = 0
-    total_ce = 0
-    total_n = 0
-
-    total_img_acc = 0
-    total_aud_acc = 0
-
+    total_acc = total_ce = total_n = 0
+    total_img_acc = total_aud_acc = 0
     probs_list = []
 
     with torch.no_grad():
         for imgs, audios, labels, labels_img, labels_aud in loader:
+            imgs, audios, labels = imgs.to(device), audios.to(device), labels.to(device)
+            labels_img, labels_aud = labels_img.to(device), labels_aud.to(device)
 
-            imgs = imgs.to(device)
-            audios = audios.to(device)
-            labels = labels.to(device)
-            labels_img = labels_img.to(device)
-            labels_aud = labels_aud.to(device)
-
-            # ===== FULL FORWARD =====
             if unimodal is None:
-                output, output_img, output_aud, output_digit_img, output_digit_aud = model.forward(imgs, audios, unimodal="train")
+                output, output_img, output_aud, out_dig_img, out_dig_aud = \
+                    model.forward(imgs, audios, unimodal="train")
                 logits = output
             else:
                 logits = model(imgs, audios, unimodal)
-
-                # no digit heads in unimodal mode
-                output_digit_img = None
-                output_digit_aud = None
+                out_dig_img = out_dig_aud = None
 
             probs = torch.exp(logits)
             probs_list.append(probs.cpu())
 
             acc, ce = traditional_cross_entropy_from_probs(probs, labels)
+            bs = labels.size(0)
+            total_acc += acc * bs; total_ce += ce * bs; total_n += bs
 
-            batch_size = labels.size(0)
-            total_acc += acc * batch_size
-            total_ce += ce * batch_size
-            total_n += batch_size
-
-            # ===== DIGIT ACCURACY =====
             if unimodal is None:
-                img_acc = (output_digit_img.argmax(1) == labels_img).float().mean()
-                aud_acc = (output_digit_aud.argmax(1) == labels_aud).float().mean()
+                total_img_acc += (out_dig_img.argmax(1) == labels_img).float().mean().item() * bs
+                total_aud_acc += (out_dig_aud.argmax(1) == labels_aud).float().mean().item() * bs
 
-                total_img_acc += img_acc.item() * batch_size
-                total_aud_acc += aud_acc.item() * batch_size
-
-    results = {
-        "acc": total_acc / total_n,
-        "ce": total_ce / total_n,
-        "probs": torch.cat(probs_list)
-    }
-
+    res = {"acc": total_acc / total_n, "ce": total_ce / total_n,
+           "probs": torch.cat(probs_list)}
     if unimodal is None:
-        results["img_digit_acc"] = total_img_acc / total_n
-        results["aud_digit_acc"] = total_aud_acc / total_n
+        res["img_digit_acc"] = total_img_acc / total_n
+        res["aud_digit_acc"] = total_aud_acc / total_n
+    return res
 
-    return results
 
-def test(model, device, loader):
-
-    joint = test_unit(model, device, loader)
-    vis = test_unit(model, device, loader, 'visual')
-    aud = test_unit(model, device, loader, 'audio')
-
+def test(model, loader):
+    joint = test_unit(model, loader)
+    vis   = test_unit(model, loader, 'visual')
+    aud   = test_unit(model, loader, 'audio')
     return {
-        "joint_acc": joint["acc"],
-        "joint_ce": joint["ce"],
-        "joint_probs": joint["probs"],
-
-        "vis_acc": vis["acc"],
-        "vis_ce": vis["ce"],
-        "vis_probs": vis["probs"],
-
-        "aud_acc": aud["acc"],
-        "aud_ce": aud["ce"],
-        "aud_probs": aud["probs"],
-
+        "joint_acc": joint["acc"], "joint_ce": joint["ce"],
+        "vis_acc":   vis["acc"],   "vis_ce":   vis["ce"],
+        "aud_acc":   aud["acc"],   "aud_ce":   aud["ce"],
         "img_digit_acc": joint["img_digit_acc"],
         "aud_digit_acc": joint["aud_digit_acc"],
     }
 
-def extract_representations(model, loader, device):
+
+def extract_representations(model, loader):
     model.eval()
-
-    visual_list = []
-    audio_list = []
-    label_list = []
-
-    visual_label_list = []
-    audio_label_list = []
+    vis_list, aud_list, y_list = [], [], []
+    img_lbl_list, aud_lbl_list = [], []
 
     with torch.no_grad():
-        for imgs, audios, labels, img_labels, audio_labels in loader:
-            imgs = imgs.to(device)
-            audios = audios.to(device)
+        for imgs, audios, labels, img_labels, aud_labels in loader:
+            img_repr, aud_repr = model.get_representations(imgs.to(device), audios.to(device))
+            vis_list.append(img_repr.cpu())
+            aud_list.append(aud_repr.cpu())
+            y_list.append(labels)
+            img_lbl_list.append(img_labels)
+            aud_lbl_list.append(aud_labels)
 
-            img_repr, aud_repr = model.get_representations(imgs, audios)
+    return (torch.cat(vis_list), torch.cat(aud_list), torch.cat(y_list),
+            torch.cat(img_lbl_list), torch.cat(aud_lbl_list))
 
-            visual_list.append(img_repr.cpu())
-            audio_list.append(aud_repr.cpu())
-            label_list.append(labels)
 
-            visual_label_list.append(img_labels)
-            audio_label_list.append(audio_labels)
+# ─── LSMI helpers ─────────────────────────────────────────────────────────────
 
-    visual_repr = torch.cat(visual_list)
-    audio_repr = torch.cat(audio_list)
-    labels = torch.cat(label_list)
+def _input(batch):
+    return batch[0].to(device), batch[1].to(device), batch[2].to(device)
 
-    img_labels = torch.cat(visual_label_list)
-    audio_labels = torch.cat(audio_label_list)
 
-    return visual_repr, audio_repr, labels, img_labels, audio_labels
+def RUS_adjustment(rus):
+    r, u1, u2, s = rus
+    R_m, U1_m, U2_m, S_m = (x.detach().mean() for x in (r, u1, u2, s))
+    adj = torch.tensor(0.0, dtype=R_m.dtype, device=R_m.device)
+    if R_m < 0 or S_m < 0:
+        adj = -torch.min(R_m, S_m)
+    elif U1_m < 0 or U2_m < 0:
+        adj = torch.min(U1_m, U2_m)
+    return r + adj, u1 - adj, u2 - adj, s + adj
+
+
+def get_mutual_info(loader, model, modality, n_classes):
+    model.eval()
+    info = []
+    with torch.no_grad():
+        for batch in loader:
+            m1, m2, labels = _input(batch)
+            x = m1 if modality == 'modality_1' else \
+                m2 if modality == 'modality_2' else torch.cat([m1, m2], dim=1)
+            out = model(x)
+            rows = torch.arange(x.size(0), device=x.device)
+            info.append(np.log(n_classes) + torch.nn.Softmax(dim=1)(out)[rows, labels].log())
+    return torch.cat(info).detach()
+
+
+def get_entropy(loader, model, modality):
+    model.eval()
+    info = []
+    with torch.no_grad():
+        for batch in loader:
+            m1, m2, _ = _input(batch)
+            x = m1 if modality == 'modality_1' else m2
+            info.append(model(x))
+    return torch.cat(info).detach()
+
+
+def obtain_discriminator(train_loader, input_size_1, input_size_2, embed_size,
+                          n_classes, num_epochs):
+    model_1 = cls_network(input_size_1, embed_size, n_classes).to(device)
+    model_2 = cls_network(input_size_2, embed_size, n_classes).to(device)
+    model_j = cls_network(input_size_1 + input_size_2, embed_size, n_classes).to(device)
+    models    = [model_1, model_2, model_j]
+    optimizer = torch.optim.Adam([p for m in models for p in m.parameters()], lr=1e-3)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.1)
+    criterion = torch.nn.CrossEntropyLoss()
+
+    for epoch in range(num_epochs):
+        total_loss = 0.; n = 0
+        for batch in train_loader:
+            m1, m2, labels = _input(batch)
+            out_1 = models[0](m1)
+            out_2 = models[1](m2)
+            out_j = models[2](torch.cat([m1, m2], dim=1))
+            optimizer.zero_grad()
+            loss = criterion(out_1, labels) + criterion(out_2, labels) + criterion(out_j, labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item() * m1.size(0); n += m1.size(0)
+        scheduler.step()
+        if (epoch + 1) % 5 == 0:
+            print(f'  Discriminator  epoch [{epoch+1}/{num_epochs}]  loss={total_loss/n:.4f}')
+    return models
+
+
+def obtain_entropy_estimator(train_loader, input_size_1, input_size_2, embed_size, num_epochs):
+    model_1 = MargKernel(dim=input_size_1).to(device)
+    model_2 = MargKernel(dim=input_size_2).to(device)
+    models    = [model_1, model_2]
+    optimizer = torch.optim.Adam([p for m in models for p in m.parameters()], lr=1e-3)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
+
+    for epoch in range(num_epochs):
+        for m in models:
+            m.train()
+        total_loss = 0.; n = 0
+        for batch in train_loader:
+            m1, m2, _ = _input(batch)
+            loss = model_1(m1) + model_2(m2)
+            optimizer.zero_grad(); loss.backward(); optimizer.step()
+            total_loss += loss.item() * m1.size(0); n += m1.size(0)
+        scheduler.step()
+        if (epoch + 1) % 5 == 0:
+            print(f'  Entropy est.   epoch [{epoch+1}/{num_epochs}]  loss={total_loss/n:.4f}')
+    return models
+
+
+def LSMI_estimation(loader, discriminator, entropy_estimator, n_classes):
+    I_X1Y  = get_mutual_info(loader, discriminator[0], 'modality_1', n_classes)
+    I_X2Y  = get_mutual_info(loader, discriminator[1], 'modality_2', n_classes)
+    I_X12Y = get_mutual_info(loader, discriminator[2], 'modality_12', n_classes)
+    H_X1   = get_entropy(loader, entropy_estimator[0], 'modality_1')
+    H_X2   = get_entropy(loader, entropy_estimator[1], 'modality_2')
+
+    r_plus  = torch.minimum(H_X1, H_X2)
+    r_minus = torch.minimum(H_X1 - I_X1Y, H_X2 - I_X2Y)
+    r  = r_plus - r_minus
+    u1 = I_X1Y  - r
+    u2 = I_X2Y  - r
+    s  = I_X12Y - r - u1 - u2
+
+    r_adj, u1_adj, u2_adj, s_adj = RUS_adjustment([r, u1, u2, s])
+    print(f"  R={r_adj.mean():.4f}  U1={u1_adj.mean():.4f}  "
+          f"U2={u2_adj.mean():.4f}  S={s_adj.mean():.4f}")
+    return r, u1, u2, s
+
 
 def normalize_pid(pid):
     pid_ = np.maximum(pid, 0)
     pid_ /= pid_.sum(axis=1, keepdims=True) + 1e-12
     return pid_
 
-def mnist(args):
 
-    # =======================
-    # 1. DATA
-    # =======================
+# ─── Main ─────────────────────────────────────────────────────────────────────
+
+def mnist(args):
     cutoff_sum = 8
+
+    # ── 1. Data ───────────────────────────────────────────────────────────────
     AV_train, AV_test = prepare_dataset(args, cutoff_sum=cutoff_sum)
 
-    # =======================
-    # 2. MODEL
-    # =======================
+    # ── 2. Model ──────────────────────────────────────────────────────────────
     model = CNN_sum(num_classes=2).to(device)
-    print(model)
-
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    # =======================
-    # 2. TRAINING
-    # =======================
-    """for epoch in range(1, args.epoch + 1):
-
-        print(f"\n===== Epoch {epoch} =====")
-
-        train(args, model, device, AV_train, optimizer, epoch)
-
-        test_metrics = test(model, device, AV_test)
-
-        print(
-            f"Joint CE: {test_metrics['joint_ce']:.4f} | "
-            f"Visual CE: {test_metrics['vis_ce']:.4f} | "
-            f"Audio CE: {test_metrics['aud_ce']:.4f}"
-        )
-
-        print(
-            f"Joint Acc: {test_metrics['joint_acc']:.4f} | "
-            f"Visual Acc: {test_metrics['vis_acc']:.4f} | "
-            f"Audio Acc: {test_metrics['aud_acc']:.4f}"
-
-        print(
-            f"Digit Acc → Img: {test_metrics['img_digit_acc']:.4f} | "
-            f"Digit Acc → Aud: {test_metrics['aud_digit_acc']:.4f}"
-        )
-        )"""
-
-    checkpoint = torch.load("cnn_sum" + str(cutoff_sum) + "_model.pt", map_location=device)
-
+    checkpoint = torch.load(f"cnn_sum{cutoff_sum}_model.pt", map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
-    # =======================
-    # SAVE MODEL
-    # =======================
-    #save_path = "cnn_sum" + str(cutoff_sum) + "_model.pt"
-
-    #torch.save({
-    #    'model_state_dict': model.state_dict(),
-    #    'optimizer_state_dict': optimizer.state_dict(),
-    #}, save_path)
-
-    #print(f"[✓] Model saved to {save_path}")
-
     model.eval()
 
-    test_metrics = test(model, device, AV_test)
+    # ── 3. Test ───────────────────────────────────────────────────────────────
+    test_metrics = test(model, AV_test)
+    print(f"Joint CE={test_metrics['joint_ce']:.4f}  Acc={test_metrics['joint_acc']:.4f}")
+    print(f"Visual CE={test_metrics['vis_ce']:.4f}  Acc={test_metrics['vis_acc']:.4f}")
+    print(f"Audio  CE={test_metrics['aud_ce']:.4f}  Acc={test_metrics['aud_acc']:.4f}")
 
-    print(
-        f"Joint CE: {test_metrics['joint_ce']:.4f} | "
-        f"Visual CE: {test_metrics['vis_ce']:.4f} | "
-        f"Audio CE: {test_metrics['aud_ce']:.4f}"
-    )
+    # ── 4. Extract representations from the multimodal model ──────────────────
+    print("\nExtracting representations…")
+    train_vis, train_aud, y_train, train_img_lbl, train_aud_lbl = \
+        extract_representations(model, AV_train)
+    test_vis,  test_aud,  y_test,  test_img_lbl,  test_aud_lbl  = \
+        extract_representations(model, AV_test)
+    print(f"  vis={train_vis.shape}  aud={train_aud.shape}")
 
-    print(
-        f"Joint Acc: {test_metrics['joint_acc']:.4f} | "
-        f"Visual Acc: {test_metrics['vis_acc']:.4f} | "
-        f"Audio Acc: {test_metrics['aud_acc']:.4f}"
-    )
-
-    # =======================
-    # 4. EXTRACT REPRESENTATIONS (SHARED!)
-    # =======================
-    train_vis, train_aud, y_train, train_img_labels, train_audio_labels = \
-        extract_representations(model, AV_train, device)
-
-    test_vis, test_aud, y_test, test_img_labels, test_audio_labels = \
-        extract_representations(model, AV_test, device)
-
-    # =======================
-    # 5. SAVE FEATURES FOR LSMI
-    # =======================
-    lsmi_data = {
+    # ── 5. Save feature tensors for LSMI loader ───────────────────────────────
+    torch.save({
         "train_modal_1_features": train_vis.float(),
         "train_modal_2_features": train_aud.float(),
-        "train_targets": y_train,
-        "val_modal_1_features": test_vis.float(),
-        "val_modal_2_features": test_aud.float(),
-        "val_targets": y_test,
-    }
+        "train_targets":          y_train,
+        "val_modal_1_features":   test_vis.float(),
+        "val_modal_2_features":   test_aud.float(),
+        "val_targets":            y_test,
+    }, "lsmi.pt")
+    print("[✓] Saved LSMI features to lsmi.pt")
 
-    torch.save(lsmi_data, "lsmi.pt")
-    print("[✓] Saved LSMI data to lsmi.pt")
-
-    # =======================
-    # 6. LSMI CONFIG
-    # =======================
+    # ── 6. LSMI config ────────────────────────────────────────────────────────
     class CFG:
         pass
-
-    cfg = CFG()
-    cfg.device = device
+    cfg            = CFG()
+    cfg.device     = device
     cfg.batch_size = 512
     cfg.num_workers = 0
-    cfg.embed_size = 128
-    cfg.n_classes = 2
-    cfg.num_epochs_discriminator = 30
-    cfg.num_epochs_entropy_estimator = 30
 
-    cfg.input_size_1 = train_vis.shape[1]
-    cfg.input_size_2 = train_aud.shape[1]
+    input_size_1 = train_vis.shape[1]
+    input_size_2 = train_aud.shape[1]
+    embed_size   = 128
+    n_classes    = 2
+    n_ep_disc    = 30
+    n_ep_ent     = 30
 
     setup_seed(args.seed)
 
-    # =======================
-    # 7. LOAD SAME FEATURES
-    # =======================
+    # ── 7. Load feature loaders ───────────────────────────────────────────────
     train_loader, val_loader = get_loader(cfg, "lsmi.pt")
 
-    # =======================
-    # 8. TRAIN LSMI ESTIMATORS
-    # =======================
-    discriminator = obtain_discriminator(cfg, train_loader)
-    entropy_estimator = obtain_entropy_estimator(cfg, train_loader)
+    # ── 8. Train LSMI estimators on learned representations ───────────────────
+    print("\nTraining discriminators…")
+    discriminator = obtain_discriminator(
+        train_loader, input_size_1, input_size_2, embed_size, n_classes, n_ep_disc)
 
-    # =======================
-    # 9. LSMI PID
-    # =======================
+    print("\nTraining entropy estimators…")
+    entropy_estimator = obtain_entropy_estimator(
+        train_loader, input_size_1, input_size_2, embed_size, n_ep_ent)
+
+    # ── 9. LSMI PID ───────────────────────────────────────────────────────────
     print("\n=== LSMI TRAIN PID ===")
-    LSMI_estimation(train_loader, discriminator, entropy_estimator, cfg)
+    LSMI_estimation(train_loader, discriminator, entropy_estimator, n_classes)
 
     print("\n=== LSMI TEST PID ===")
-    r, u1, u2, s = LSMI_estimation(val_loader, discriminator, entropy_estimator, cfg)
+    r, u1, u2, s = LSMI_estimation(val_loader, discriminator, entropy_estimator, n_classes)
 
-    # =======================
-    # 10. STACK POINTWISE PID
-    # =======================
+    # ── 10. Stack pointwise PID ───────────────────────────────────────────────
     pid_lsmi = np.stack([
-        u1.detach().cpu().numpy(),
-        u2.detach().cpu().numpy(),
-        r.detach().cpu().numpy(),
-        s.detach().cpu().numpy()
-    ], axis=1)
+        u1.cpu().numpy(), u2.cpu().numpy(),
+        r.cpu().numpy(),  s.cpu().numpy(),
+    ], axis=1)   # columns: [U_vis, U_aud, R, S]
 
-    # =======================
-    # 11. RUS ADJUSTMENT
-    # =======================
+    # ── 11. RUS adjustment ────────────────────────────────────────────────────
     r, u1, u2, s = RUS_adjustment([r, u1, u2, s])
-
-    r = r.detach().cpu().numpy()
-    u1 = u1.detach().cpu().numpy()
-    u2 = u2.detach().cpu().numpy()
-    s = s.detach().cpu().numpy()
-
     print("\n=== AFTER RUS ADJUSTMENT ===")
-    print("R:", np.mean(r))
-    print("U1:", np.mean(u1))
-    print("U2:", np.mean(u2))
-    print("S:", np.mean(s))
+    print(f"R={r.mean():.4f}  U_vis={u1.mean():.4f}  "
+          f"U_aud={u2.mean():.4f}  S={s.mean():.4f}")
 
-    # =======================
-    # 12. SUBGROUP ANALYSIS (ALIGNED WITH YOUR FIRST CODE)
-    # =======================
+    # ── 12. Subgroup analysis ──────────────────────────────────────────────────
     synergy, redundancy, u0_list, u1_list = [], [], [], []
-
-    for img_label, aud_label, pid_val in zip(
-        test_img_labels, test_audio_labels, pid_lsmi
-    ):
-
+    for img_label, aud_label, pid_val in zip(test_img_lbl, test_aud_lbl, pid_lsmi):
+        t = torch.tensor(pid_val)[None, :]
         if img_label + aud_label > cutoff_sum:
-
-            if img_label > cutoff_sum and aud_label > cutoff_sum:
-                redundancy.append(torch.tensor(pid_val)[None, :])
-
-            elif img_label <= cutoff_sum and aud_label > cutoff_sum:
-                u1_list.append(torch.tensor(pid_val)[None, :])
-
-            elif img_label > cutoff_sum and aud_label <= cutoff_sum:
-                u0_list.append(torch.tensor(pid_val)[None, :])
-
-            else:
-                synergy.append(torch.tensor(pid_val)[None, :])
+            if   img_label > cutoff_sum and aud_label > cutoff_sum: redundancy.append(t)
+            elif img_label <= cutoff_sum and aud_label > cutoff_sum: u1_list.append(t)
+            elif img_label > cutoff_sum and aud_label <= cutoff_sum: u0_list.append(t)
+            else: synergy.append(t)
         else:
-            synergy.append(torch.tensor(pid_val)[None, :])
+            synergy.append(t)
 
-    print("\n=== SUBGROUP PID ===")
-    print("Synergy:", torch.mean(torch.cat(synergy), dim=0))
-    print("Redundancy:", torch.mean(torch.cat(redundancy), dim=0))
-    print("U0:", torch.mean(torch.cat(u0_list), dim=0))
-    print("U1:", torch.mean(torch.cat(u1_list), dim=0))
+    print("\n=== SUBGROUP PID (mean [U_vis, U_aud, R, S]) ===")
+    print("Redundancy :", torch.mean(torch.cat(redundancy), dim=0))
+    print("Unique_vis :", torch.mean(torch.cat(u0_list),    dim=0))
+    print("Unique_aud :", torch.mean(torch.cat(u1_list),    dim=0))
+    print("Synergy    :", torch.mean(torch.cat(synergy),    dim=0))
 
-    # =======================
-    # 13. COSINE SIMILARITY
-    # =======================
-    list_pid = [
-        torch.cat(redundancy),
-        torch.cat(u0_list),
-        torch.cat(u1_list),
-        torch.cat(synergy)
-    ]
-
-    list_labels = [
+    # ── 13. Normalised cosine similarity ──────────────────────────────────────
+    list_pid = [torch.cat(redundancy), torch.cat(u0_list),
+                torch.cat(u1_list),    torch.cat(synergy)]
+    list_lbl = [
         torch.cat([torch.tensor([0, 0, 1, 0])[None, :]] * len(list_pid[0])),
         torch.cat([torch.tensor([1, 0, 0, 0])[None, :]] * len(list_pid[1])),
         torch.cat([torch.tensor([0, 1, 0, 0])[None, :]] * len(list_pid[2])),
         torch.cat([torch.tensor([0, 0, 0, 1])[None, :]] * len(list_pid[3])),
     ]
 
-    pid = torch.cat(list_pid).numpy()
-    pid_labels = torch.cat(list_labels).numpy()
+    pid       = torch.cat(list_pid).float().numpy()
+    pid_labels = torch.cat(list_lbl).float().numpy()
 
-    pid_norm = normalize_pid(pid)
-
-    pid_l2 = pid_norm / (np.linalg.norm(pid_norm, axis=1, keepdims=True) + 1e-12)
+    pid_norm  = normalize_pid(pid)
+    pid_l2    = pid_norm  / (np.linalg.norm(pid_norm,   axis=1, keepdims=True) + 1e-12)
     labels_l2 = pid_labels / (np.linalg.norm(pid_labels, axis=1, keepdims=True) + 1e-12)
+    print("\nBefore correction  cosine sim:", np.sum(pid_l2 * labels_l2, axis=1).mean())
 
-    sim = np.sum(pid_l2 * labels_l2, axis=1)
+    for i, p in enumerate(pid):
+        if p[0] < 0 and p[1] >= 0:
+            pid[i] = [0, p[1], p[2], p[3] + p[0]]
+        if p[1] < 0 and p[0] >= 0:
+            pid[i] = [p[0], 0, p[2], p[3] + p[1]]
 
-    print("\nBefore Normalization Mean cosine similarity:", sim.mean())
-
-    for i, pid_i in enumerate(pid):
-        if pid_i[0] < 0 and pid_i[1] >= 0:
-            pid_i_copy = [0, pid_i[1], pid_i[2], pid_i[3]+pid_i[0]]
-            pid[i] = pid_i_copy
-        if pid_i[1] < 0 and pid_i[0] >= 0:
-            pid_i_copy = [pid_i[0], 0, pid_i[2], pid_i[3]+pid_i[1]]
-            pid[i] = pid_i_copy
-
-    pid_norm = normalize_pid(pid)
-
-    pid_l2 = pid_norm / (np.linalg.norm(pid_norm, axis=1, keepdims=True) + 1e-12)
-    labels_l2 = pid_labels / (np.linalg.norm(pid_labels, axis=1, keepdims=True) + 1e-12)
-
-    sim = np.sum(pid_l2 * labels_l2, axis=1)
-
-    print("\nAfter Normalization Mean cosine similarity:", sim.mean())
-
+    pid_norm  = normalize_pid(pid)
+    pid_l2    = pid_norm  / (np.linalg.norm(pid_norm,   axis=1, keepdims=True) + 1e-12)
+    print("After  correction  cosine sim:", np.sum(pid_l2 * labels_l2, axis=1).mean())
 
 
 if __name__ == '__main__':
     args = config().parse_args()
-
-    import random
-    import numpy as np
-    import torch
-
-
-    def set_seed(seed):
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-
-        # Ensures deterministic behavior (important for reproducibility)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-
     mnist(args)

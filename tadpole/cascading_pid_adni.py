@@ -6,13 +6,14 @@ Under the Gaussian residual assumption Y|X ~ N(f(X), MSE):
   H(Y|X)  = 0.5 * log(2πe * MSE)
   I(Y;X)  = 0.5 * log(Var(Y) / MSE) = -0.5 * log(1 - R²)
 
-PID is computed in nats (sign-filtered pointwise I_min), then mapped
-to variance-explained space via R² = 1 - exp(-2I) and rescaled so
-that R²_R + R²_U_old + R²_U_new + R²_S = R²_joint.
+PID is computed in nats (sign-filtered pointwise I_min for R_total),
+then mapped to variance-explained space via direct R² arithmetic:
+  r2_R = 1 - exp(-2R),  r2_U = r2_unimodal - r2_R,  r2_S = r2_joint - rest
+All four components are rescaled once so they sum to R²_joint.
 
 Redundancy decomposition:
   R_total  = E[min(i_old, i_new) * 1{both > 0}]   (sign-filtered I_min)
-  R_source from Gács-Körner worst-head predictor
+  R_source = MI_from_r2(min(r2_a, r2_b))  from Gács-Körner worst-head R²
   R_mech   = R_total - R_source
 """
 
@@ -53,32 +54,41 @@ def nats_to_r2(I_nats):
     return 1.0 - np.exp(-2.0 * max(0.0, I_nats))
 
 
-def pid_nats_to_r2(R, U_old, U_new, S, R2_joint):
+def pid_nats_to_r2(R_nats, r2_old, r2_new, r2_joint, R_source_nats=None):
     """
-    Map PID components from nats to variance-explained space,
-    then rescale so they sum exactly to R²_joint.
+    Map PID from nats → variance-explained using direct R² arithmetic.
 
-    Returns dict with r2_R, r2_U_old, r2_U_new, r2_S, r2_unexplained.
+      r2_R     = 1 - exp(-2*R)       only R is converted via nats
+      r2_U_old = r2_old - r2_R       direct subtraction (can be negative)
+      r2_U_new = r2_new - r2_R
+      r2_S     = r2_joint - r2_R - r2_U_old - r2_U_new
+
+    All four components are rescaled so they sum to r2_joint.
+    r2_R_source and r2_R_mech are computed independently from nats
+    (not as a fraction of r2_R) and receive the same rescaling.
     """
-    r2_R = nats_to_r2(R)
-    r2_U_old = nats_to_r2(U_old)
-    r2_U_new = nats_to_r2(U_new)
-    r2_S = nats_to_r2(S)
+    R_nats_c   = max(0.0, R_nats)
+    r2_R       = 1.0 - np.exp(-2.0 * R_nats_c)
+    r2_U_old   = r2_old - r2_R
+    r2_U_new   = r2_new - r2_R
+    r2_S       = r2_joint - r2_R - r2_U_old - r2_U_new
 
-    raw_sum = r2_R + r2_U_old + r2_U_new + r2_S
-    if raw_sum > 1e-12:
-        scale = R2_joint / raw_sum
-        r2_R *= scale
-        r2_U_old *= scale
-        r2_U_new *= scale
-        r2_S *= scale
+    raw_sum = r2_R + r2_U_old + r2_U_new + r2_S   # equals r2_joint by construction
+    scale   = (r2_joint / raw_sum) if abs(raw_sum) > 1e-12 else 1.0
+    r2_R     *= scale
+    r2_U_old *= scale
+    r2_U_new *= scale
+    r2_S     *= scale
+
+    # r2_R_source and r2_R_mech computed directly from nats, same rescaling
+    R_src = min(max(0.0, R_source_nats if R_source_nats is not None else 0.0), R_nats_c)
+    r2_R_source = (1.0 - np.exp(-2.0 * R_src)) * scale
+    r2_R_mech   = (np.exp(-2.0 * R_src) - np.exp(-2.0 * R_nats_c)) * scale
 
     return {
-        "r2_R": r2_R,
-        "r2_U_old": r2_U_old,
-        "r2_U_new": r2_U_new,
-        "r2_S": r2_S,
-        "r2_unexplained": 1.0 - R2_joint,
+        "r2_R": r2_R, "r2_U_old": r2_U_old, "r2_U_new": r2_U_new, "r2_S": r2_S,
+        "r2_R_source": r2_R_source, "r2_R_mech": r2_R_mech,
+        "r2_unexplained": 1.0 - r2_joint,
     }
 
 
@@ -392,14 +402,10 @@ def train_gk(Xa_tr, Xb_tr, y_tr, Xa_va, Xb_va, y_va,
     mse_a = mean_squared_error(y_te, pred_a)
     mse_b = mean_squared_error(y_te, pred_b)
 
-    # Pointwise MI for each GK head
     i_a = pointwise_info(y_te, pred_a, var_y, y_bar, mse_a)
     i_b = pointwise_info(y_te, pred_b, var_y, y_bar, mse_b)
-
-    # Sign-filtered I_min: source redundancy per sample
     both_pos = (i_a > 0) & (i_b > 0)
     r_source = np.where(both_pos, np.minimum(i_a, i_b), 0.0)
-
     return float(np.mean(r_source))
 
 
@@ -431,7 +437,7 @@ def run_cascade(splits, modalities, device="cpu"):
     I_base = MI_from_r2(r2_base)
 
     # Map to variance-explained (step 0: all is U_old)
-    ve_base = pid_nats_to_r2(0, I_base, 0, 0, r2_base)
+    ve_base = pid_nats_to_r2(0.0, r2_base, 0.0, r2_base)
 
     print(f"  R² = {r2_base:.4f},  I = {I_base:.4f} nats")
 
@@ -510,23 +516,27 @@ def run_cascade(splits, modalities, device="cpu"):
         R_total_nats = max(pid["R"], R_source_nats)
         R_total_nats = min(R_total_nats, pid["I_old"], pid["I_new"])
         R_source_nats = min(R_source_nats, R_total_nats)
+
+        # Recompute U/S consistently with the final R_total_nats
+        U_old_nats = pid["I_old"] - R_total_nats
+        U_new_nats = pid["I_new"] - R_total_nats
+        S_nats     = pid["I_joint"] - pid["I_old"] - pid["I_new"] + R_total_nats
+
+        # Negative synergy: absorb |S| into R and R_source, set S=0
+        if S_nats < 0:
+            R_total_nats  -= S_nats
+            R_source_nats -= S_nats
+            R_source_nats  = min(R_source_nats, R_total_nats)
+            U_old_nats = pid["I_old"] - R_total_nats
+            U_new_nats = pid["I_new"] - R_total_nats
+            S_nats = 0.0
+
         R_mech_nats = max(0.0, R_total_nats - R_source_nats)
-        U_old_nats = pid["U_old"]
-        U_new_nats = pid["U_new"]
-        S_nats = pid["S"]
         I_joint = pid["I_joint"]
         R2_joint = pid["R2_joint"]
 
         # -- Map to variance-explained space --
-        ve = pid_nats_to_r2(R_total_nats, U_old_nats, U_new_nats, S_nats, R2_joint)
-
-        # Split R² redundancy into source + mechanistic (same ratio as nats)
-        if R_total_nats > 1e-12:
-            source_frac = R_source_nats / R_total_nats
-        else:
-            source_frac = 0.0
-        r2_R_source = ve["r2_R"] * source_frac
-        r2_R_mech = ve["r2_R"] * (1.0 - source_frac)
+        ve = pid_nats_to_r2(R_total_nats, pid["R2_old"], pid["R2_new"], R2_joint, R_source_nats)
 
         print(f"\n  R²_old   = {pid['R2_old']:.4f}  ({', '.join(accumulated[:-1])})")
         print(f"  R²_new   = {pid['R2_new']:.4f}  ({best_mod})")
@@ -538,7 +548,7 @@ def run_cascade(splits, modalities, device="cpu"):
         print(f"    U_new   = {U_new_nats:.4f}")
         print(f"    S       = {S_nats:.4f}")
         print(f"\n  PID as fraction of Var(Y) (sum to 1):")
-        print(f"    R       = {ve['r2_R']:.4f}  [source: {r2_R_source:.4f}, mech: {r2_R_mech:.4f}]")
+        print(f"    R       = {ve['r2_R']:.4f}  [source: {ve['r2_R_source']:.4f}, mech: {ve['r2_R_mech']:.4f}]")
         print(f"    U_old   = {ve['r2_U_old']:.4f}")
         print(f"    U_new   = {ve['r2_U_new']:.4f}")
         print(f"    S       = {ve['r2_S']:.4f}")
@@ -558,7 +568,7 @@ def run_cascade(splits, modalities, device="cpu"):
             # Variance-explained
             "r2_R": ve["r2_R"], "r2_U_old": ve["r2_U_old"],
             "r2_U_new": ve["r2_U_new"], "r2_S": ve["r2_S"],
-            "r2_R_source": r2_R_source, "r2_R_mech": r2_R_mech,
+            "r2_R_source": ve["r2_R_source"], "r2_R_mech": ve["r2_R_mech"],
             "r2_unexplained": ve["r2_unexplained"],
         })
 

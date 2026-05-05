@@ -53,7 +53,7 @@ NUM_GENRES = len(GENRE_NAMES)
 parser = argparse.ArgumentParser()
 parser.add_argument("--data-root",       default="/home/rlouiset/imdb")
 parser.add_argument("--img-size",        default=224,   type=int)
-parser.add_argument("--max-txt-len",     default=128,   type=int)
+parser.add_argument("--max-txt-len",     default=512,   type=int)
 parser.add_argument("--img-encoder",     default="convnext",
                     choices=["resnet50", "convnext", "blip_vit"])
 parser.add_argument("--txt-encoder",     default="roberta",
@@ -71,6 +71,8 @@ parser.add_argument("--load-model",     default="/home/rlouiset/imdb_model.pth",
                     help="Skip training and load from this path if the file exists")
 parser.add_argument("--mod0",           default="image")
 parser.add_argument("--mod1",           default="text")
+parser.add_argument("--results-dir",    default="/home/rlouiset/imdb/results",
+                    help="Directory where top-5 qualitative examples are saved")
 args = parser.parse_args()
 
 NUM_CLASSES = NUM_GENRES
@@ -719,32 +721,31 @@ if __name__ == "__main__":
     pid_norm = normalize_pid(pid_source)
     print("After correction  Normalised mean:", np.mean(pid_norm, axis=0))
 
-    # ── 11. Top-5 qualitative examples per PID component ──────────────────────
+    # ── 11. Save top-5 qualitative examples per PID component ────────────────
     # pid_norm columns: 0 = U_img, 1 = U_txt, 2 = R, 3 = S
-    component_names = [
-        f"U_{args.mod0}  (unique to image)",
-        f"U_{args.mod1}  (unique to text)",
-        "R  (redundancy)",
-        "S  (synergy)",
-    ]
+    comp_dirs = [f"U_{args.mod0}", f"U_{args.mod1}", "R", "S"]
 
-    print(f"\n{'='*70}")
-    print("Top-5 qualitative examples per PID component (by normalised %)")
-    print(f"{'='*70}")
-
-    for col, cname in enumerate(component_names):
+    for col, cdir in enumerate(comp_dirs):
+        out_dir = os.path.join(args.results_dir, cdir)
+        os.makedirs(out_dir, exist_ok=True)
         top5 = np.argsort(pid_norm[:, col])[-5:][::-1]
-        print(f"\n{'─'*60}")
-        print(f"  {cname}")
-        print(f"{'─'*60}")
         for rank, i in enumerate(top5, 1):
-            genre   = GENRE_NAMES[test_labels[i]]
-            snippet = test_texts[i][:120].replace('\n', ' ').strip()
+            real_i  = test_idx[i]
             pv      = pid_norm[i]
-            print(f"  [{rank}] Genre : {genre}")
-            print(f"       Text  : {snippet!r}")
-            print(f"       PID % : "
-                  f"U_img={100*pv[0]:.1f}%  "
-                  f"U_txt={100*pv[1]:.1f}%  "
-                  f"R={100*pv[2]:.1f}%  "
-                  f"S={100*pv[3]:.1f}%")
+            genre   = GENRE_NAMES[test_labels[i]]
+
+            # save image
+            img_pil = Image.fromarray(images_np[real_i].transpose(1, 2, 0))
+            img_pil.save(os.path.join(out_dir, f"rank{rank}.png"))
+
+            # save text + metadata
+            with open(os.path.join(out_dir, f"rank{rank}_info.txt"), 'w') as f:
+                f.write(f"Rank    : {rank}\n")
+                f.write(f"Genre   : {genre}\n")
+                f.write(f"PID %   : U_img={100*pv[0]:.1f}%  "
+                        f"U_txt={100*pv[1]:.1f}%  "
+                        f"R={100*pv[2]:.1f}%  "
+                        f"S={100*pv[3]:.1f}%\n")
+                f.write(f"\nText:\n{test_texts[i]}\n")
+
+    print(f"\nTop-5 examples saved to {args.results_dir}/")
