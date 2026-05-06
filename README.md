@@ -1,101 +1,271 @@
-# Quantifying &amp; Modeling Multimodal Interactions
+# Pointwise Partial Information Decomposition with Supervised Gács-Körner Source Redundancy
 
-This repository contains the code for the following papers on quantifying and modeling multimodal interactions
+This repository contains the code for our NeurIPS submission:
 
-[**Multimodal Learning Without Labeled Multimodal Data: Guarantees and Applications**](https://arxiv.org/abs/2306.04539)<br>
-Paul Pu Liang, Chun Kai Ling, Yun Cheng, Alex Obolenskiy, Yudong Liu, Rohan Pandey, Alex Wilf, Louis-Philippe Morency, Ruslan Salakhutdinov<br>
-ICLR 2024.
+> **Pointwise Partial Information Decomposition with Supervised Gács-Körner Source Redundancy**  
+> Anonymous Author(s)
 
-[**Quantifying & Modeling Multimodal Interactions: An Information Decomposition Framework**](https://arxiv.org/abs/2302.12247)<br>
-Paul Pu Liang, Yun Cheng, Xiang Fan, Chun Kai Ling, Suzanne Nie, Richard Chen, Zihao Deng, Nicholas Allen, Randy Auerbach, Faisal Mahmood, Ruslan Salakhutdinov, Louis-Philippe Morency<br>
-NeurIPS 2023.
+## Overview
 
-[**Multimodal Fusion Interactions: A Study of Human and Automatic Quantification**](https://arxiv.org/abs/2306.04125)<br> 
-Paul Pu Liang, Yun Cheng, Ruslan Salakhutdinov, Louis-Philippe Morency<br>
-ICMI 2023.
+We introduce a framework for **pointwise partial information decomposition (PID)** that estimates sample-level redundancy, uniqueness, and synergy between two modalities and a target. The three main contributions are:
 
-If you find this repository useful, please cite the relevant works:
+1. **Pointwise PID estimator** combining the I_min principle (Williams & Beer, 2010) with unambiguous sign-filtering (Ince, 2017), requiring only unimodal and multimodal predictors of Y and knowledge of the target distribution p(y).
+
+2. **Supervised Gács-Körner objective** that estimates *source redundancy* by learning cross-modal embeddings constrained to be aligned and predictive of Y, generalizing the Gács-Körner common information (Gács & Körner, 1973) to the supervised setting. This enables decomposing redundancy into a *source* component (shared input structure) and a *mechanistic* component (shared processing pathway). We also show that CLIP implicitly optimizes a relaxed form of this objective.
+
+3. **Experiments** on synthetic benchmarks, controlled multimodal tasks (logic circuits, AV-MNIST, Food-101, MM-IMDB, CMU-MOSEI, UR-Funny, MUStARD), and a clinical application to Huntington's Disease (ADNI/TADPOLE) demonstrating accurate estimation, faithful source–mechanistic separation, and novel neuroscientific insights.
+
+The codebase is built on top of [Liang et al. 2023](https://arxiv.org/abs/2302.12247) (*Quantifying & Modeling Multimodal Interactions: An Information Decomposition Framework*, NeurIPS 2023). Their original code and citations are preserved below.
+
+---
+
+## Repository Structure
+
 ```
-@inproceedings{liangmultimodal,
-  title={Multimodal Learning Without Labeled Multimodal Data: Guarantees and Applications},
-  author={Liang, Paul Pu and Ling, Chun Kai and Cheng, Yun and Obolenskiy, Alexander and Liu, Yudong and Pandey, Rohan and Wilf, Alex and Morency, Louis-Philippe and Salakhutdinov, Russ},
-  booktitle={The Twelfth International Conference on Learning Representations}
-}
+.
+├── utils_ours.py                  # Core: CCS redundancy + supervised GK source redundancy
+├── utils_lsmi.py                  # LSMI baseline estimator
+├── utils_ours_variant.py          # Variant estimators
+│
+├── synthetic/                     # Synthetic data generation and benchmark experiments
+│   ├── generate_data.py           # Original Liang et al. generator (redundancy/unique/synergy/mixed)
+│   ├── generate_data_custom.py    # Extended generator with controllable mix ratios
+│   ├── experiments/
+│   │   ├── generate_data.sh       # Generates the full suite of synthetic datasets
+│   │   ├── generate_data_custom.sh# Generates custom mix-ratio datasets
+│   │   ├── base.py                # Multimodal training on synthetic data
+│   │   ├── lsmi_base.py           # LSMI estimation on synthetic data
+│   │   ├── lsmi_repr_base.py      # LSMI on learned representations
+│   │   └── ccs_source_aware_base.py # Our CCS + GK estimator on synthetic data
+│
+├── logic_circuit/                 # Controlled PID benchmarks: AND / OR / XOR
+│   ├── and.py / or.py / xor.py
+│   ├── and_batch.py / or_batch.py / xor_batch.py
+│   └── *_lsmi.py                  # LSMI baselines for each circuit
+│
+├── av_mnist/                      # Audio-Visual MNIST (image digit + audio waveform)
+│   ├── avmnist_sum_update.py      # CoMM training + CCS PID
+│   └── avmnist_sum_lsmi.py        # LSMI PID on learned representations
+│
+├── food101/                       # Food-101 (image + recipe text)
+│   ├── food101_comm_ccs_pid.py    # CoMM + CCS PID
+│   └── food101_comm_lsmi.py       # LSMI baseline
+│
+├── imdb/                          # MM-IMDB (movie poster + plot text, 23-class genre)
+│   └── imdb_comm_ccs_pid.py       # CoMM + CCS PID + top-5 qualitative examples per component
+│
+├── affect/                        # Affect/sentiment multimodal datasets
+│   ├── mosei_comm_ccs_source_redundancy.py   # CMU-MOSEI sentiment
+│   ├── humor_comm_ccs_source_redundancy.py   # UR-Funny humor detection
+│   ├── sarcasm_comm_ccs_source_redundancy.py # MUStARD sarcasm detection
+│   └── *_lsmi_pid.py              # LSMI baselines
+│
+├── trifeatures/                   # Trifeatures synthetic benchmark
+│   ├── trifeatures_comm_ccs_pid.py
+│   └── trifeatures_comm_lsmi.py
+│
+├── tadpole/                       # Clinical application: ADNI/TADPOLE
+│   ├── cascading_pid_adni.py              # Cascading PID on cross-sectional ADAS-13
+│   └── cascading_pid_adni_longitudinal.py # Cascading PID on longitudinal ADAS-13 slope
+│
+├── bounds/                        # Synergy bounds (from Liang et al.)
+├── estimators/                    # CVXPY and batch PID estimators
+├── fusions/                       # Fusion module implementations
+├── objective_functions/           # Training objectives (CCA, contrastive, etc.)
+└── environment.yml
 ```
+
+---
+
+## Installation
+
+```bash
+git clone <repo>
+cd PID
+conda env create -n pid -f environment.yml
+conda activate pid
+export PYTHONPATH=$(pwd)
 ```
+
+---
+
+## Experiments
+
+### Synthetic Benchmarks
+
+The synthetic datasets are generated by taking inspiration from Liang et al. 2023, extended with controllable mixed-regime datasets.
+
+Generate the standard suite (redundancy, uniqueness×2, synergy, mixed, random):
+```bash
+bash synthetic/experiments/generate_data.sh
+```
+
+Generate custom datasets with explicit PID mix ratios (order: redundancy / uniqueness₀ / uniqueness₁ / synergy):
+```bash
+python synthetic/generate_data_custom.py \
+    --num-data 10000 --setting mixed \
+    --mix-ratio 0.4 0.3 0.2 0.1 \
+    --out-path synthetic/experiments
+```
+
+Or generate the full custom suite:
+```bash
+bash synthetic/experiments/generate_data_custom.sh
+```
+
+Run our CCS + supervised GK estimator on a synthetic dataset:
+```bash
+python synthetic/experiments/ccs_source_aware_base.py \
+    --data-path synthetic/experiments/DATA_redundancy.pickle \
+    --keys 0 1 label --bs 256 --input-dim 200 --hidden-dim 512 --num-classes 2
+```
+
+Run the LSMI baseline:
+```bash
+python synthetic/experiments/lsmi_base.py \
+    --data-path synthetic/experiments/DATA_redundancy.pickle \
+    --keys 0 1 label --bs 256 --input-dim 200
+```
+
+### Logic Circuits (AND / OR / XOR)
+
+Controlled benchmarks where ground-truth PID is analytically known:
+```bash
+python logic_circuit/and.py
+python logic_circuit/or.py
+python logic_circuit/xor.py
+```
+
+Batch evaluation across all settings:
+```bash
+python logic_circuit/and_batch.py
+python logic_circuit/or_batch.py
+python logic_circuit/xor_batch.py
+```
+
+### AV-MNIST
+
+Image (28×28 digit) + audio waveform → digit class.
+```bash
+# Train CoMM model and compute CCS PID
+python av_mnist/avmnist_sum_update.py \
+    --data-path /path/to/avmnist \
+    --saved-model checkpoints/avmnist_best.pt
+
+# Compute LSMI PID on learned representations
+python av_mnist/avmnist_sum_lsmi.py \
+    --data-path /path/to/avmnist \
+    --load-model checkpoints/avmnist_best.pt
+```
+
+### Food-101
+
+Image (food photo) + text (recipe) → 101-class food category.
+```bash
+python food101/food101_comm_ccs_pid.py \
+    --data-root /path/to/food101 \
+    --saved-model checkpoints/food101_best.pt
+```
+
+### MM-IMDB
+
+Movie poster (image) + plot synopsis (text) → 23-class genre prediction.
+Multi-label annotations are resolved to single-label via a rarest-active-genre strategy.
+
+```bash
+python imdb/imdb_comm_ccs_pid.py \
+    --data-root /path/to/imdb \
+    --img-encoder convnext \
+    --txt-encoder roberta \
+    --max-txt-len 512 \
+    --bs 32 --epochs 20 \
+    --saved-model /path/to/imdb_model.pth \
+    --results-dir /path/to/results
+```
+
+Top-5 qualitative examples per PID component (image + text) are saved to `--results-dir`.
+
+### Affect Datasets (CMU-MOSEI / UR-Funny / MUStARD)
+
+```bash
+python affect/mosei_comm_ccs_source_redundancy.py   # CMU-MOSEI sentiment
+python affect/humor_comm_ccs_source_redundancy.py   # UR-Funny humor detection
+python affect/sarcasm_comm_ccs_source_redundancy.py # MUStARD sarcasm detection
+```
+
+### ADNI / TADPOLE — Clinical Application
+
+Cascading PID over multimodal biomarkers (Demographics → CSF Amyloid → CSF Tau → Volumetric MRI → FDG-PET) predicting ADAS-13 from baseline ADNI/TADPOLE data. Each cascade step reveals the redundancy (source vs. mechanistic), uniqueness, and synergy contributed by the newly added biomarker modality.
+
+**Cross-sectional target (ADAS-13 at baseline):**
+```bash
+python tadpole/cascading_pid_adni.py \
+    --tadpole-path /path/to/tadpole.csv \
+    --adnimerge-path /path/to/adnimerge.csv \
+    --output-dir results/cascade_cross_sectional
+```
+
+**Longitudinal target (annual ADAS-13 slope, pts/yr):**
+```bash
+python tadpole/cascading_pid_adni_longitudinal.py \
+    --tadpole-path /path/to/tadpole.csv \
+    --adnimerge-path /path/to/adnimerge.csv \
+    --min-months 12 \
+    --output-dir results/cascade_longitudinal
+```
+
+Both scripts output:
+- `cascade_results.json` — full PID table (in nats and variance-explained R² fractions)
+- `cascading_pid.pdf` — pie chart per cascade step, color-coded by PID component (R source, R mech, U old, U new, Synergy, Unexplained)
+
+---
+
+## Core Estimators
+
+### `utils_ours.py` — CCS + Supervised GK
+
+The main estimation logic shared across all experiments.
+
+- **`return_redundancy_test_performances`**: trains the supervised Gács-Körner network whose cross-modal embeddings are constrained to agree while remaining predictive of Y. Returns per-sample source redundancy scores.
+- **Pointwise PID**: sign-filtered I_min redundancy R, unique contributions U₁, U₂, and synergy S at the individual-sample level. Distribution-level PID is the sample average.
+
+### `utils_lsmi.py` — LSMI Baseline
+
+Least-Squares Mutual Information (LSMI) estimator used as a comparison baseline for distribution-level PID.
+
+---
+
+## Acknowledgements & Base Code
+
+This repository takes inspiration from the codebase of:
+
+> **Quantifying & Modeling Multimodal Interactions: An Information Decomposition Framework**  
+> Paul Pu Liang, Yun Cheng, Xiang Fan, Chun Kai Ling, Suzanne Nie, Richard Chen, Zihao Deng, Nicholas Allen, Randy Auerbach, Faisal Mahmood, Ruslan Salakhutdinov, Louis-Philippe Morency  
+> NeurIPS 2023. [[arXiv]](https://arxiv.org/abs/2302.12247)
+
+> **Multimodal Learning Without Labeled Multimodal Data: Guarantees and Applications**  
+> Paul Pu Liang, Chun Kai Ling, Yun Cheng, Alex Obolenskiy, Yudong Liu, Rohan Pandey, Alex Wilf, Louis-Philippe Morency, Ruslan Salakhutdinov  
+> ICLR 2024. [[arXiv]](https://arxiv.org/abs/2306.04539)
+
+Please cite their work if you use the shared infrastructure:
+
+```bibtex
 @inproceedings{liang2023quantifying,
   title={Quantifying \& Modeling Multimodal Interactions: An Information Decomposition Framework},
-  author={Liang, Paul Pu and Cheng, Yun and Fan, Xiang and Ling, Chun Kai and Nie, Suzanne and Chen, Richard and Deng, Zihao and Mahmood, Faisal and Salakhutdinov, Ruslan and Morency, Louis-Philippe},
+  author={Liang, Paul Pu and Cheng, Yun and Fan, Xiang and Ling, Chun Kai and Nie, Suzanne
+          and Chen, Richard and Deng, Zihao and Mahmood, Faisal and Salakhutdinov, Ruslan
+          and Morency, Louis-Philippe},
   booktitle={Advances in Neural Information Processing Systems},
   year={2023}
 }
 ```
-```
-@inproceedings{liang2023multimodal,
-  author = {Liang, Paul Pu and Cheng, Yun and Salakhutdinov, Ruslan and Morency, Louis-Philippe},
-  title = {Multimodal Fusion Interactions: A Study of Human and Automatic Quantification},
-  year = {2023},
-  isbn = {9798400700552},
-  publisher = {Association for Computing Machinery},
-  address = {New York, NY, USA},
-  url = {https://doi.org/10.1145/3577190.3614151},
-  doi = {10.1145/3577190.3614151},
-  booktitle = {Proceedings of the 25th International Conference on Multimodal Interaction},
-  pages = {425–435},
-  numpages = {11},
-  keywords = {Multimodal fusion, Affective computing, Multimodal interactions},
-  location = {Paris, France},
-  series = {ICMI '23}
+
+```bibtex
+@inproceedings{liangmultimodal,
+  title={Multimodal Learning Without Labeled Multimodal Data: Guarantees and Applications},
+  author={Liang, Paul Pu and Ling, Chun Kai and Cheng, Yun and Obolenskiy, Alexander
+          and Liu, Yudong and Pandey, Rohan and Wilf, Alex and Morency, Louis-Philippe
+          and Salakhutdinov, Russ},
+  booktitle={The Twelfth International Conference on Learning Representations}
 }
 ```
-
-## Usage
-### Environment Setup Using Conda
-To install the repository, first clone the repository via Git, and then install the prerequisite packages through Conda (Linux/MacOS):
-```
-conda env create [-n ENVNAME] -f environment.yml
-```
-### Experiments
-First, add the path:
-```
-export PYTHONPATH=$(pwd)
-```
-#### Synthetic Data
-The code for synthetic data experiments in the paper *Quantifying & Modeling Multimodal Interactions: An Information Decomposition Framework* is located under `synthetic/`.
-
-To generate synthetic data, run
-```
-python synthetic/generate_data.py --num-data 20000 --setting redundancy --out-path synthetic/experiments
-```
-
-To generate the suite of synthetic data, which includes 4 specialized datasets, 6 mixed datasets, and 5 random datasets for evaluating model selection, run
-```
-bash synthetic/experiments/generate_data.sh
-```
-
-Example command to train a multimodal model on synthetic data
-```
-python synthetic/experiments/base.py --data-path synthetic/experiments/DATA_redundancy.pickle --keys 0 1 label --bs 256 --input-dim 200 --hidden-dim 512 --n-latent 600 --num-classes 2 --saved-model synthetic/experiments/redundancy/redundancy_base_best.pt --modalities 1 1
-```
-
-To train the suite of multimodal models on all synthetic data, run
-```
-bash synthetic/experiments/experiments.sh
-```
-
-To train an unimodal version of a multimodal model (which are used in analyzing connections between PID and model robustness in the presence of missing modalities), run
-```
-bash synthetic/experiments/unimodal_experiments.sh
-```
-
-#### Real-World Data
-We rely on the original [MultiBench](https://github.com/pliang279/MultiBench) implementations for real-world data experiments. Please refer to the repo for more details on training and evaluation.
-
-### PID Estimator
-To run the CVXPY PID estimator on a multimodal dataset, we first need to obtain a discrete clustered version of the original dataset using existing clustering algorithms such as K-Means. After that, call the `convert_data_to_distribution` function in `synthetic/rus.py` on the clustered version of the dataset and then `get_measure` function to get the PID estimates. More details of data clustering and example usage of the PID estimator can be found in the `synthetic/experiments/clustering.ipynb` notebook.
-
-### Analysis and Model Selection
-Examples of computing the PID agreement metric and analyzing the correlation between agreement and model performance can be found in the `synthetic/experiments/analysis.ipynb` notebook. Examples of applying PID in multimodal model selection can be found in the `synthetic/model_selection/analysis.ipynb` notebook.
-
-### Estimating Synergy
-Code for computing the lower and upper bound for synergy can be found in `bounds/bounds.py`. Examples of estimating synergy for synthetic bitwise datasets (including data generation) can be found in the `bounds/bounds_synthetic.ipynb` notebook and examples of estimating synergy for real-world multimodal datasets can be found in the `bounds/bounds_real.ipynb` notebook. Details on pre-processing real-world datasets can be found in the `bounds/clustering.ipynb` notebook.
