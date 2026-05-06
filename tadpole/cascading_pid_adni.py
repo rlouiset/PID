@@ -599,7 +599,7 @@ def plot_cascade(results, save_path="cascading_pid.pdf"):
         return "+".join(short_name(m) for m in mods)
 
     n = len(results)
-    fig, axes = plt.subplots(1, n, figsize=(3.2 * n, 4))
+    fig, axes = plt.subplots(1, n, figsize=(5.0 * n, 6.5))
     if n == 1:
         axes = [axes]
 
@@ -614,13 +614,11 @@ def plot_cascade(results, save_path="cascading_pid.pdf"):
 
     for i, (ax, r) in enumerate(zip(axes, results)):
         added = short_name(r["added"])
-        old_mods = short_list(r["accumulated"][:-1]) if i > 0 else ""
-        new_mod = added
 
         if i == 0:
             vals = [r["r2_U_old"], r["r2_unexplained"]]
             labs = [
-                f'U({added})\n{r["r2_U_old"]:.1%}',
+                f'Unique\n{r["r2_U_old"]:.1%}',
                 f'Unexplained\n{r["r2_unexplained"]:.1%}',
             ]
             cols = [C["U_old"], C["unexplained"]]
@@ -631,11 +629,11 @@ def plot_cascade(results, save_path="cascading_pid.pdf"):
                 r["r2_S"], r["r2_unexplained"],
             ]
             labs = [
-                f'R_src({new_mod},\n{old_mods})\n{r["r2_R_source"]:.1%}',
-                f'R_mech({new_mod},\n{old_mods})\n{r["r2_R_mech"]:.1%}',
-                f'U({old_mods})\n{r["r2_U_old"]:.1%}',
-                f'U({new_mod})\n{r["r2_U_new"]:.1%}',
-                f'S({new_mod},\n{old_mods})\n{r["r2_S"]:.1%}',
+                f'R source\n{r["r2_R_source"]:.1%}',
+                f'R mech.\n{r["r2_R_mech"]:.1%}',
+                f'U old\n{r["r2_U_old"]:.1%}',
+                f'U new\n{r["r2_U_new"]:.1%}',
+                f'Synergy\n{r["r2_S"]:.1%}',
                 f'Unexplained\n{r["r2_unexplained"]:.1%}',
             ]
             cols = [
@@ -651,7 +649,8 @@ def plot_cascade(results, save_path="cascading_pid.pdf"):
 
         ax.pie(
             vals, labels=labs, colors=cols, startangle=90,
-            textprops={"fontsize": 6},
+            labeldistance=1.2,
+            textprops={"fontsize": 10},
             wedgeprops={"edgecolor": "white", "linewidth": 1.5},
         )
         title = (
@@ -659,7 +658,7 @@ def plot_cascade(results, save_path="cascading_pid.pdf"):
         )
         ax.set_title(
             f"{title}\nR²={r['R2_joint']:.3f}",
-            fontsize=9, fontweight="bold",
+            fontsize=13, fontweight="bold", pad=14,
         )
 
     patches = [
@@ -671,8 +670,8 @@ def plot_cascade(results, save_path="cascading_pid.pdf"):
         mpatches.Patch(color=C["unexplained"], label="Unexplained"),
     ]
     fig.legend(
-        handles=patches, loc="lower center", ncol=3, fontsize=8,
-        frameon=False, bbox_to_anchor=(0.5, -0.02),
+        handles=patches, loc="lower center", ncol=3, fontsize=11,
+        frameon=False, bbox_to_anchor=(0.5, -0.01),
     )
     plt.tight_layout(rect=[0, 0.08, 1, 1])
     plt.savefig(save_path, dpi=300, bbox_inches="tight")

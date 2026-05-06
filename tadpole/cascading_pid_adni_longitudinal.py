@@ -111,7 +111,7 @@ def compute_pid(y, y_pred_old, y_pred_new, y_pred_joint):
 # 1. DATA — LONGITUDINAL SLOPE TARGET
 # ============================================================
 
-def compute_adas13_slopes(df_adni, min_months=24):
+def compute_adas13_slopes(df_adni, min_months=12):
     """
     For each patient, compute cognitive slope as the average of
     (ADAS13_t - ADAS13_bl) / (t_months / 12) across ALL visits
@@ -151,7 +151,7 @@ def compute_adas13_slopes(df_adni, min_months=24):
     return pd.DataFrame(slopes)
 
 
-def load_data_slope(tadpole_path, adnimerge_path, min_months=24):
+def load_data_slope(tadpole_path, adnimerge_path, min_months=12):
     """
     Load baseline features from TADPOLE + ADNIMERGE, and compute
     the ADAS13 slope as target from all future visits >= min_months.
@@ -579,7 +579,7 @@ def plot_cascade(results, save_path="cascading_pid_slope.pdf"):
     def sl(mods): return "+".join(sn(m) for m in mods)
 
     n = len(results)
-    fig, axes = plt.subplots(1, n, figsize=(3.2 * n, 4))
+    fig, axes = plt.subplots(1, n, figsize=(5.0 * n, 6.5))
     if n == 1: axes = [axes]
 
     C = {
@@ -590,22 +590,21 @@ def plot_cascade(results, save_path="cascading_pid_slope.pdf"):
 
     for i, (ax, r) in enumerate(zip(axes, results)):
         added = sn(r["added"])
-        old_mods = sl(r["accumulated"][:-1]) if i > 0 else ""
 
         if i == 0:
             vals = [r["r2_U_old"], r["r2_unexplained"]]
-            labs = [f'U({added})\n{r["r2_U_old"]:.1%}',
+            labs = [f'Unique\n{r["r2_U_old"]:.1%}',
                     f'Unexplained\n{r["r2_unexplained"]:.1%}']
             cols = [C["U_old"], C["unexplained"]]
         else:
             vals = [r["r2_R_source"], r["r2_R_mech"],
                     r["r2_U_old"], r["r2_U_new"],
                     r["r2_S"], r["r2_unexplained"]]
-            labs = [f'R_src({added},\n{old_mods})\n{r["r2_R_source"]:.1%}',
-                    f'R_mech({added},\n{old_mods})\n{r["r2_R_mech"]:.1%}',
-                    f'U({old_mods})\n{r["r2_U_old"]:.1%}',
-                    f'U({added})\n{r["r2_U_new"]:.1%}',
-                    f'S({added},\n{old_mods})\n{r["r2_S"]:.1%}',
+            labs = [f'R source\n{r["r2_R_source"]:.1%}',
+                    f'R mech.\n{r["r2_R_mech"]:.1%}',
+                    f'U old\n{r["r2_U_old"]:.1%}',
+                    f'U new\n{r["r2_U_new"]:.1%}',
+                    f'Synergy\n{r["r2_S"]:.1%}',
                     f'Unexplained\n{r["r2_unexplained"]:.1%}']
             cols = [C["R_source"], C["R_mech"], C["U_old"],
                     C["U_new"], C["S"], C["unexplained"]]
@@ -614,10 +613,11 @@ def plot_cascade(results, save_path="cascading_pid_slope.pdf"):
         if keep: vals, labs, cols = zip(*keep)
 
         ax.pie(vals, labels=labs, colors=cols, startangle=90,
-               textprops={"fontsize": 6},
+               labeldistance=1.2,
+               textprops={"fontsize": 10},
                wedgeprops={"edgecolor": "white", "linewidth": 1.5})
         title = f"Step {i}: +{added}" if i > 0 else f"Step 0: {added}"
-        ax.set_title(f"{title}\nR²={r['R2_joint']:.3f}", fontsize=9, fontweight="bold")
+        ax.set_title(f"{title}\nR²={r['R2_joint']:.3f}", fontsize=13, fontweight="bold", pad=14)
 
     patches = [
         mpatches.Patch(color=C["R_source"], label="Redundancy (source)"),
@@ -627,10 +627,10 @@ def plot_cascade(results, save_path="cascading_pid_slope.pdf"):
         mpatches.Patch(color=C["S"], label="Synergy"),
         mpatches.Patch(color=C["unexplained"], label="Unexplained"),
     ]
-    fig.legend(handles=patches, loc="lower center", ncol=3, fontsize=8,
-               frameon=False, bbox_to_anchor=(0.5, -0.02))
+    fig.legend(handles=patches, loc="lower center", ncol=3, fontsize=11,
+               frameon=False, bbox_to_anchor=(0.5, -0.01))
     fig.suptitle("Cascading PID — Predicting ADAS13 Slope (pts/yr) from Baseline",
-                 fontsize=11, fontweight="bold", y=1.02)
+                 fontsize=13, fontweight="bold", y=1.02)
     plt.tight_layout(rect=[0, 0.08, 1, 1])
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     print(f"\nSaved: {save_path}")
@@ -669,7 +669,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--tadpole-path", type=str, required=True)
     parser.add_argument("--adnimerge-path", type=str, required=True)
-    parser.add_argument("--min-months", type=int, default=24,
+    parser.add_argument("--min-months", type=int, default=12,
                         help="Minimum follow-up in months for slope computation")
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--output-dir", type=str,
