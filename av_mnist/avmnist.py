@@ -84,8 +84,8 @@ def prepare_dataset(args):
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
-    v_train = datasets.MNIST('data', train=True, download=False, transform=transform)
-    v_test = datasets.MNIST('data', train=False, transform=transform)
+    v_train = datasets.MNIST('/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/', train=True, download=False, transform=transform)
+    v_test = datasets.MNIST('/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/', train=False, transform=transform)
     a_train, a_test = load_fsdd()
 
     # Create a multimodal dataset instance and its DataLoader
