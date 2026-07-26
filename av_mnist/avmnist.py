@@ -498,6 +498,7 @@ def mnist(args):
 
     model = CNN().to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
 
     print(model)
 
@@ -509,6 +510,7 @@ def mnist(args):
         print(f"\n===== Epoch {epoch} =====")
 
         train(args, model, device, AV_train, optimizer, epoch)
+        scheduler.step()
 
         test_metrics = test(model, device, AV_test)
 

@@ -200,7 +200,11 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
     ):
         super().__init__()
 
-        self.save_hyperparameters()
+        # `model` is a plain nn.Module and already gets its weights saved via the
+        # standard state_dict mechanism; pickling it into hparams too makes the
+        # checkpoint depend on unpickling a custom class, which torch>=2.6's default
+        # `weights_only=True` refuses. Keep hparams to primitives only.
+        self.save_hyperparameters(ignore=['model'])
 
         self.model = model
 
@@ -368,7 +372,10 @@ def return_redundancy_test_performances(
     best_model_path = trainer.checkpoint_callback.best_model_path
     print(f"Best redundancy model saved at: {best_model_path}")
 
-    best_model = RedundancyRepresentationLightningModel.load_from_checkpoint(best_model_path, weights_only=False)
+    # `model` was excluded from the pickled hparams (see save_hyperparameters(ignore=['model'])
+    # above), so it must be passed back in here; load_from_checkpoint then restores its
+    # weights from the checkpoint's state_dict onto this fresh instance.
+    best_model = RedundancyRepresentationLightningModel.load_from_checkpoint(best_model_path, model=model)
 
     trainer.test(best_model, datamodule=datamodule)
 
