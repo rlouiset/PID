@@ -196,6 +196,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
         distribution_target: str = "gaussian",
         lambda_reg=10,
         lr: float = 1e-4,
+        head_lr: float = None,
     ):
         super().__init__()
 
@@ -205,6 +206,7 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
 
         self.distribution_target = distribution_target
         self.lr = lr
+        self.head_lr = head_lr if head_lr is not None else lr
 
         self.lambda_reg = lambda_reg
 
@@ -215,7 +217,16 @@ class RedundancyRepresentationLightningModel(pl.LightningModule):
         return self.model(modality0, modality1)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        # projectors are shaped by align_loss/sup_clip_loss (governed by lambda_reg);
+        # the classification head only ever sees detached z0/z1, so it can safely use
+        # a higher lr to converge faster, same as the Discrim probes in the batch estimator.
+        head_params    = list(self.model.head.parameters())
+        head_param_ids = {id(p) for p in head_params}
+        projector_params = [p for p in self.parameters() if id(p) not in head_param_ids]
+        return torch.optim.Adam([
+            {"params": projector_params, "lr": self.lr},
+            {"params": head_params,      "lr": self.head_lr},
+        ])
 
     # -------------------------
     # Shared step
@@ -317,7 +328,7 @@ def return_redundancy_test_performances(
     y_train, y_val, y_test,
     config_name,
     ids_train=None, ids_val=None, ids_test=None,
-    distribution_target="gaussian", lambda_reg=10, num_classes=1, h_dim=1024, lr=1e-4
+    distribution_target="gaussian", lambda_reg=10, num_classes=1, h_dim=1024, lr=1e-4, head_lr=None
 ):
 
     if ids_train is None:
@@ -340,7 +351,8 @@ def return_redundancy_test_performances(
         model,
         distribution_target=distribution_target,
         lambda_reg=lambda_reg,
-        lr=lr
+        lr=lr,
+        head_lr=head_lr
     )
 
     checkpoint_dir = f"checkpoints/{config_name}/redundancy"

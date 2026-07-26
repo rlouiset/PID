@@ -61,19 +61,9 @@ parser.add_argument("--num-workers",  default=4,   type=int)
 parser.add_argument("--embed-dim",    default=512, type=int,
                     help="FusionTransformer width (512 as in CoMM notebook)")
 parser.add_argument("--epochs",       default=50,  type=int)
-parser.add_argument("--lr",           default=1e-4, type=float,
-                    help="Backbone (encoders + fusion transformer) learning rate")
-parser.add_argument("--head-lr",      default=1e-3, type=float,
-                    help="Joint / unimodal classification head learning rate "
-                         "(matches the Discrim lr used in trifeatures_comm_batch.py)")
+parser.add_argument("--lr",           default=1e-4, type=float)
 parser.add_argument("--weight-decay", default=1e-2, type=float)
 parser.add_argument("--saved-model",  default=None, type=str)
-# Source (sup-GK) redundancy estimator
-parser.add_argument("--redundancy-lr",      default=1e-4, type=float,
-                    help="Redundancy projector learning rate")
-parser.add_argument("--redundancy-head-lr", default=1e-3, type=float,
-                    help="Redundancy classification head learning rate "
-                         "(matches the Discrim lr used in trifeatures_comm_batch.py)")
 args = parser.parse_args()
 
 NUM_CLASSES = args.num_classes
@@ -594,22 +584,9 @@ class TriFeaturesCoMMModel(nn.Module):
 # TRAINING / TESTING
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def train_comm(model, traindata, validdata, epochs, lr, head_lr, weight_decay, save=None):
-    """
-    Backbone (encoders + adapters + fusion) trains at `lr`; the joint/unimodal
-    classification heads train at `head_lr` -- a plain classifier on top of
-    features converges much faster than the feature extractor itself, so it
-    gets the same higher lr that worked for the Discrim probes in
-    trifeatures_comm_batch.py.
-    """
-    criterion = nn.CrossEntropyLoss()
-    head_params    = list(model.head.parameters()) + list(model.mod_heads.parameters())
-    head_param_ids = {id(p) for p in head_params}
-    backbone_params = [p for p in model.parameters() if id(p) not in head_param_ids]
-    optimizer = torch.optim.AdamW([
-        {"params": backbone_params, "lr": lr},
-        {"params": head_params,     "lr": head_lr},
-    ], weight_decay=weight_decay)
+def train_comm(model, traindata, validdata, epochs, lr, weight_decay, save=None):
+    criterion  = nn.CrossEntropyLoss()
+    optimizer  = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     best_model = copy.deepcopy(model)
     best_val   = float("inf")
 
@@ -869,7 +846,7 @@ if __name__ == "__main__":
     # ========= 3. TRAIN =========
     print("\nTraining…")
     model = train_comm(model, traindata, testdata,
-                       epochs=args.epochs, lr=args.lr, head_lr=args.head_lr,
+                       epochs=args.epochs, lr=args.lr,
                        weight_decay=args.weight_decay,
                        save=args.saved_model)
 
@@ -897,9 +874,7 @@ if __name__ == "__main__":
         y_train.long(), y_test.long(), y_test.long(),
         f"trifeatures_{args.task}_biased={args.biased}",
         distribution_target="categorical",
-        num_classes=NUM_CLASSES,
-        lr=args.redundancy_lr,
-        head_lr=args.redundancy_head_lr,
+        num_classes=NUM_CLASSES
     )
 
     results = compute_redundancy_metrics(y_pred_dict)
