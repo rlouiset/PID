@@ -85,8 +85,8 @@ def prepare_dataset():
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,)),
     ])
-    v_train = datasets.MNIST('data', train=True,  download=True, transform=transform)
-    v_test  = datasets.MNIST('data', train=False,                transform=transform)
+    v_train = datasets.MNIST('/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/', train=True,  download=False, transform=transform)
+    v_test  = datasets.MNIST('/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/', train=False,                transform=transform)
     a_train, a_test = load_fsdd()
 
     loader_kwargs = dict(num_workers=0, pin_memory=True, drop_last=False)
