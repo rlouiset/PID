@@ -64,8 +64,8 @@ def load_fsdd():
     ])
 
     # Initialize a generator for a local version of FSDD
-    fsdd = TorchFSDDGenerator(version='local', path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10', transforms=transforms,
-                              load_all=True) #  '/Users/robinlouiset/Documents/torch-fsdd/lib/test/data/v1.0.10'
+    fsdd = TorchFSDDGenerator(version='local', path='/lustre/fswork/projects/rech/haj/uik24xv/datasets/torch-fsdd/lib/test/data/v1.0.10', transforms=transforms,
+                              load_all=True) #  '/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10'
 
     # Create two Torch datasets for a train-test split from the generator
     train_set, test_set = fsdd.train_test_split(test_size=0.2)
@@ -548,6 +548,13 @@ def mnist(args):
     joint_acc = test_metrics["joint_acc"]
     vis_acc = test_metrics["vis_acc"]
     aud_acc = test_metrics["aud_acc"]
+
+    # =======================
+    # 4b. MUTUAL INFORMATION I(Y; (X1,X2))
+    # =======================
+    H_Y = compute_entropy_from_targets(y_test, num_classes=10)
+    mi_joint = H_Y - joint_ce
+    print(f"\nI(Y; (X1,X2)) = H(Y) - H(Y|X1,X2) = {H_Y:.4f} - {joint_ce:.4f} = {mi_joint:.4f} nats")
 
     # =======================
     # 5. CCS REDUNDANCY

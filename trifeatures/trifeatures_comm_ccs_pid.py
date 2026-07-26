@@ -878,6 +878,11 @@ if __name__ == "__main__":
     d = test_comm(model, testdata)
     print_model_metrics(d)
 
+    # ========= 4b. MUTUAL INFORMATION I(Y; (X1,X2)) =========
+    H_Y = compute_entropy_from_targets(d["true_labels"], NUM_CLASSES)
+    mi_joint = H_Y - d["joint_ce"]
+    print(f"\nI(Y; (X1,X2)) = H(Y) - H(Y|X1,X2) = {H_Y:.4f} - {d['joint_ce']:.4f} = {mi_joint:.4f} nats")
+
     # ========= 5. EXTRACT REPRESENTATIONS =========
     print("\nExtracting representations…")
     X_train, y_train = extract_split(model, traindata)
