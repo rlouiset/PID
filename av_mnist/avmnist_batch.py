@@ -74,7 +74,7 @@ def load_fsdd():
     ])
     fsdd = TorchFSDDGenerator(
         version='local',
-        path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
+        path='/lustre/fswork/projects/rech/haj/uik24xv/datasets/torch-fsdd/lib/test/data/v1.0.10', # '/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
         transforms=audio_transforms, load_all=True,
     )
     return fsdd.train_test_split(test_size=0.2)
