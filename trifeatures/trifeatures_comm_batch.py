@@ -41,7 +41,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
 # Data / task
-parser.add_argument("--data-root",    default="/home/rlouiset/trifeatures_data", type=str)
+parser.add_argument("--data-root",    default="/lustre/fswork/projects/rech/haj/uik24xv/datasets/trifeatures_data", type=str)
 parser.add_argument("--task",         default="share",
                     choices=["share", "unique1", "unique2", "synergy"],
                     help=("share: classify shared shape (redundancy). "
