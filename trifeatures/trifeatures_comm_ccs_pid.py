@@ -380,11 +380,18 @@ class BimodalTrifeatures(Trifeatures):
         self.biased      = biased
         self.max_size    = int(max_size)
 
+        # Separate RNG stream for image *pairing*, independent of self.rng (which is
+        # used for image *generation* and only advances on a cache miss -- reusing it
+        # here would make idx_pairs depend on whether generate_data() ran in this
+        # process, so two runs against the same --data-root could silently end up
+        # evaluating on different train/test pairs despite identical underlying images.
+        self.pairing_rng = np.random.default_rng(seed)
+
         attrs = dict(color=self.color_to_idx, shape=self.shape_to_idx,
                      texture=self.texture_to_idx)
         synergy_vals = (sorted(attrs[synergy_attr[0]].values()),
                         sorted(attrs[synergy_attr[1]].values()))
-        perm = self.rng.permutation(synergy_vals[1])
+        perm = self.pairing_rng.permutation(synergy_vals[1])
         self.correlated_feature_pairs = list(zip(synergy_vals[0], perm))
         self.idx_pairs = self._get_idx_pairs()
 
@@ -412,10 +419,10 @@ class BimodalTrifeatures(Trifeatures):
             pos = np.argwhere(share_eq & synergy_eq)
             neg = np.argwhere(share_eq & ~synergy_eq)
             n_each = min(len(pos), len(neg), self.max_size // 2)
-            pos_sel = self.rng.choice(len(pos), size=n_each, replace=False)
-            neg_sel = self.rng.choice(len(neg), size=n_each, replace=False)
+            pos_sel = self.pairing_rng.choice(len(pos), size=n_each, replace=False)
+            neg_sel = self.pairing_rng.choice(len(neg), size=n_each, replace=False)
             pairs = np.vstack([pos[pos_sel], neg[neg_sel]])
-            self.rng.shuffle(pairs)
+            self.pairing_rng.shuffle(pairs)
             return pairs
 
         allowed = np.argwhere(share_eq & (synergy_eq if self.biased
@@ -423,7 +430,7 @@ class BimodalTrifeatures(Trifeatures):
         n_allowed = len(allowed)
         if self.max_size > n_allowed:
             self.max_size = n_allowed
-        sel = self.rng.choice(n_allowed, size=self.max_size, replace=False)
+        sel = self.pairing_rng.choice(n_allowed, size=self.max_size, replace=False)
         return allowed[sel]
 
     def reshuffle(self):
