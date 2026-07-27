@@ -44,9 +44,9 @@ def config():
     parser.add_argument('--log-interval',         type=int,   default=30)
     parser.add_argument('--seed',                 type=int,   default=1)
     # Batch / CE-alignment
-    parser.add_argument('--ce-hidden-dim',        type=int,   default=128,
-                        help='Hidden dim of the CE-alignment discriminators (mirrors --lsmi-embed-size)')
-    parser.add_argument('--ce-embed-dim',         type=int,   default=10,
+    parser.add_argument('--ce-hidden-dim',        type=int,   default=1024,
+                        help='Hidden dim of the CE-alignment discriminators')
+    parser.add_argument('--ce-embed-dim',         type=int,   default=1024,
                         help='Per-class embedding dim used by the alignment module')
     parser.add_argument('--ce-bs',                type=int,   default=1024,
                         help='Batch size for discriminator / alignment training (mirrors --lsmi-bs)')
