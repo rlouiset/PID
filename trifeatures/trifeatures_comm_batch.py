@@ -779,6 +779,25 @@ def eval_ce_alignment(model, dataloader):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# DIAGNOSTICS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def compute_entropy_from_targets(targets, num_classes, verbose=True):
+    targets = torch.as_tensor(targets).long()
+    counts  = torch.bincount(targets, minlength=num_classes).float()
+    probs   = counts / counts.sum()
+    if verbose:
+        print("counts     :", counts.tolist())
+        print("p(y) per-cls:", [round(x, 4) for x in probs.tolist()])
+        print("sum p(y)    :", probs.sum().item())
+        print("n_samples   :", int(counts.sum().item()))
+        print("max label   :", int(targets.max().item()),
+              " min label:", int(targets.min().item()))
+    probs = torch.clamp(probs, 1e-12, 1.0)
+    return -(probs * torch.log(probs)).sum().item()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -797,6 +816,15 @@ if __name__ == "__main__":
     traindata, testdata = get_dataloaders(
         args.data_root, args.task, args.biased, args.bs, args.num_workers)
     print(f"  train={len(traindata.dataset)}  test={len(testdata.dataset)}")
+
+    # ========= 1b. LABEL DISTRIBUTION SANITY CHECK =========
+    # Same check as trifeatures_comm_ccs_pid.py's compute_entropy_from_targets(verbose=True) --
+    # compare counts/p(y)/n_samples/H(Y) here against the CCS run's printout to confirm
+    # both scripts are seeing the same underlying test-set label distribution.
+    print("\nTest-set label distribution (before training):")
+    test_labels = torch.cat([y for _, _, y in testdata])
+    H_Y_check = compute_entropy_from_targets(test_labels, NUM_CLASSES, verbose=True)
+    print(f"H(Y) [test, pre-training] = {H_Y_check:.4f} nats\n")
 
     # ========= 2. MODEL =========
     model = TriFeaturesCoMMModel(
