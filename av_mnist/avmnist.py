@@ -74,7 +74,7 @@ def load_fsdd():
 
 def prepare_dataset(args):
     train_kwargs = {'batch_size': args.batch_size, 'shuffle': True}
-    test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': False}
+    test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': True}
     cuda_kwargs = {'num_workers': 0,
                    'pin_memory': True,
                    'drop_last': False}
@@ -604,7 +604,7 @@ def mnist(args):
         y_test,
         "redundancy",
         distribution_target="categorical",
-        lambda_reg=10,
+        lambda_reg=5,
         num_classes=10
     )
 

@@ -258,8 +258,8 @@ def cosine_similarity(a, b):
     """
     Row-wise cosine similarity
     """
-    a = a / np.linalg.norm(a, axis=1, keepdims=True)
-    b = b / np.linalg.norm(b, axis=1, keepdims=True)
+    a = a / (np.linalg.norm(a, axis=1, keepdims=True) + 1e-12)
+    b = b / (np.linalg.norm(b, axis=1, keepdims=True) + 1e-12)
     return np.sum(a * b, axis=1)
 
 def compute_ce_from_probs(probs_list, targets):

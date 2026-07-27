@@ -109,8 +109,8 @@ class RedundancyRepresentationModel(nn.Module):
         z0 = self.projector_0(modality0)
         z1 = self.projector_1(modality1)
 
-        z0 = z0 / z0.norm(p=2, dim=1, keepdim=True)
-        z1 = z1 / z1.norm(p=2, dim=1, keepdim=True)
+        z0 = z0 / z0.norm(p=2, dim=1, keepdim=True).clamp_min(1e-8)
+        z1 = z1 / z1.norm(p=2, dim=1, keepdim=True).clamp_min(1e-8)
 
         y_pred_0 = self.head(z0.detach())
         y_pred_1 = self.head(z1.detach())
