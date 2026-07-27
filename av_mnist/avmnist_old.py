@@ -74,7 +74,7 @@ def load_fsdd():
 
 def prepare_dataset(args):
     train_kwargs = {'batch_size': args.batch_size, 'shuffle': True}
-    test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': False}
+    test_kwargs = {'batch_size': args.test_batch_size, 'shuffle': True}
     cuda_kwargs = {'num_workers': 0,
                    'pin_memory': True,
                    'drop_last': False}
@@ -561,16 +561,14 @@ def mnist(args):
     # =======================
     log_py = compute_log_py(y_test, num_classes=10)
 
-    print(vis_probs[:3])
+    print(vis_probs[:10])
     print('-')
-    print(aud_probs[:3])
+    print(aud_probs[:10])
 
     ce_list = compute_ce_from_probs(
         [vis_probs, aud_probs],
         y_test
     )
-    print('-')
-    print(ce_list[:5])
 
     i_list = compute_pointwise_information(ce_list, log_py)
 
