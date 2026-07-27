@@ -744,10 +744,18 @@ def logp(p):
     return torch.log(torch.clamp(p, 1e-12, 1.0))
 
 
-def compute_entropy_from_targets(targets, num_classes):
+def compute_entropy_from_targets(targets, num_classes, verbose=False):
     targets = torch.as_tensor(targets).long()
     counts  = torch.bincount(targets, minlength=num_classes).float()
-    probs   = torch.clamp(counts / counts.sum(), 1e-12, 1.0)
+    probs   = counts / counts.sum()
+    if verbose:
+        print("counts     :", counts.tolist())
+        print("p(y) per-cls:", [round(x, 4) for x in probs.tolist()])
+        print("sum p(y)    :", probs.sum().item())
+        print("n_samples   :", int(counts.sum().item()))
+        print("max label   :", int(targets.max().item()),
+              " min label:", int(targets.min().item()))
+    probs = torch.clamp(probs, 1e-12, 1.0)
     return -(probs * torch.log(probs)).sum().item()
 
 
