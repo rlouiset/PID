@@ -859,9 +859,9 @@ if __name__ == "__main__":
     discrim_2  = Discrim(repr_dim, args.ce_hidden_dim, NUM_CLASSES, layers=2, activation='relu').to(device)
     discrim_12 = JointDiscrim(2 * repr_dim, args.ce_hidden_dim, NUM_CLASSES, layers=2, activation='relu').to(device)
 
-    train_discrim_simple(discrim_1,  ce_train, epochs=args.epochs_discriminator, lr=1e-3, mode='x1')
-    train_discrim_simple(discrim_2,  ce_train, epochs=args.epochs_discriminator, lr=1e-3, mode='x2')
-    train_discrim_simple(discrim_12, ce_train, epochs=args.epochs_discriminator, lr=1e-3, mode='joint')
+    train_discrim_simple(discrim_1,  ce_train, epochs=args.epochs_discriminator, lr=1e-4, mode='x1')
+    train_discrim_simple(discrim_2,  ce_train, epochs=args.epochs_discriminator, lr=1e-4, mode='x2')
+    train_discrim_simple(discrim_12, ce_train, epochs=args.epochs_discriminator, lr=1e-4, mode='joint')
 
     # ========= 7. ESTIMATE p(y) =========
     p_y = torch.bincount(y_train, minlength=NUM_CLASSES).float()
@@ -879,7 +879,7 @@ if __name__ == "__main__":
         p_y=p_y,
     ).to(device)
 
-    train_ce_alignment(ce_model, ce_train, epochs=args.epochs_ce, lr=1e-3)
+    train_ce_alignment(ce_model, ce_train, epochs=args.epochs_ce, lr=1e-4)
 
     # ========= 9. GLOBAL PID =========
     print("\nEvaluating…")
