@@ -611,7 +611,8 @@ def mnist(args):
         "redundancy",
         distribution_target="categorical",
         lambda_reg=10,
-        num_classes=10
+        num_classes=10,
+        lr=1e-3
     )
 
     results = {}

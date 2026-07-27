@@ -17,4 +17,4 @@ conda activate py39
 export WANDB_MODE=offline
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID"
 export PYTHONPATH="/lustre/fswork/projects/rech/haj/uik24xv/datasets/torch-fsdd/lib/:${PYTHONPATH}"
-srun python3 av_mnist/avmnist_batch.py
+srun python3 av_mnist/avmnist_batch.py --seed 2
