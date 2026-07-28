@@ -612,7 +612,7 @@ def mnist(args):
         distribution_target="categorical",
         lambda_reg=10,
         num_classes=10,
-        lr=1e-5
+        lr=1e-4
     )
 
     results = {}
