@@ -8,7 +8,7 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --constraint a100
 #SBATCH --account haj@a100
-#SBATCH --output avmnist_ccs.txt
+#SBATCH --output avmnist_ccs_lambda1.txt
 
 module purge # purge modules inherited by default
 conda deactivate # deactivate environments inherited by default
