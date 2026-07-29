@@ -817,7 +817,7 @@ def mnist(args):
         y_test,
         "redundancy",
         distribution_target="categorical",
-        lambda_reg=1,
+        lambda_reg=25,
         num_classes=2
     )
 
