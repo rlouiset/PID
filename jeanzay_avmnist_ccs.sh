@@ -8,7 +8,7 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --constraint a100
 #SBATCH --account haj@a100
-#SBATCH --output avmnist_ccs_lambda100.txt
+#SBATCH --output avmnist_sum_ccs_lambda1.txt
 
 module purge # purge modules inherited by default
 conda deactivate # deactivate environments inherited by default
@@ -17,4 +17,4 @@ conda activate py39
 export WANDB_MODE=offline
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID"
 export PYTHONPATH="/lustre/fswork/projects/rech/haj/uik24xv/datasets/torch-fsdd/lib/:${PYTHONPATH}"
-srun python3 av_mnist/avmnist.py
+srun python3 av_mnist/avmnist_sum_update.py

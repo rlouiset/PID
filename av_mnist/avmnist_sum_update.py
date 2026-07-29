@@ -161,14 +161,14 @@ def load_fsdd():
 
     fsdd_train = TorchFSDDGenerator(
         version='local',
-        path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
+        path='/lustre/fswork/projects/rech/haj/uik24xv/datasets/torch-fsdd/lib/test/data/v1.0.10', # '/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10'
         transforms=train_transforms,
         load_all=True
     )
 
     fsdd_test = TorchFSDDGenerator(
         version='local',
-        path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10',
+        path='/lustre/fswork/projects/rech/haj/uik24xv/datasets/torch-fsdd/lib/test/data/v1.0.10', # '/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10'
         transforms=test_transforms,
         load_all=True
     )
@@ -194,14 +194,14 @@ def prepare_dataset(args, cutoff_sum):
 
     # separate transforms
     v_train = datasets.MNIST(
-        'data',
+        '/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/',
         train=True,
-        download=True,
+        download=False,
         transform=get_image_transforms(train=True)
     )
 
     v_test = datasets.MNIST(
-        'data',
+        '/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/',
         train=False,
         transform=get_image_transforms(train=False)
     )
@@ -817,7 +817,7 @@ def mnist(args):
         y_test,
         "redundancy",
         distribution_target="categorical",
-        lambda_reg=10,
+        lambda_reg=1,
         num_classes=2
     )
 
