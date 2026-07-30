@@ -185,6 +185,30 @@ def test(model, device, loader):
         "aud_probs": aud_probs,
     }
 
+def compute_ece(probs, targets, num_bins=15):
+    """
+    Expected Calibration Error (ECE):
+        bins predictions by confidence (max prob) and compares
+        average confidence to accuracy within each bin.
+    """
+    confidences, predictions = probs.max(dim=1)
+    accuracies = predictions.eq(targets)
+
+    bin_boundaries = torch.linspace(0, 1, num_bins + 1)
+    bin_lowers = bin_boundaries[:-1]
+    bin_uppers = bin_boundaries[1:]
+
+    ece = torch.zeros(1)
+    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
+        in_bin = (confidences > bin_lower) & (confidences <= bin_upper)
+        prop_in_bin = in_bin.float().mean()
+        if prop_in_bin.item() > 0:
+            acc_in_bin = accuracies[in_bin].float().mean()
+            conf_in_bin = confidences[in_bin].mean()
+            ece += torch.abs(conf_in_bin - acc_in_bin) * prop_in_bin
+
+    return ece.item()
+
 def compute_ce_from_probs(probs_list, targets):
     """
     From logits → probabilities + CE for each modality
@@ -550,6 +574,19 @@ def mnist(args):
     aud_acc = test_metrics["aud_acc"]
 
     # =======================
+    # 4a. CALIBRATION (ECE)
+    # =======================
+    joint_ece = compute_ece(joint_probs, y_test)
+    vis_ece = compute_ece(vis_probs, y_test)
+    aud_ece = compute_ece(aud_probs, y_test)
+
+    print(
+        f"\nJoint ECE: {joint_ece:.4f} | "
+        f"Visual ECE: {vis_ece:.4f} | "
+        f"Audio ECE: {aud_ece:.4f}"
+    )
+
+    # =======================
     # 4b. MUTUAL INFORMATION I(Y; (X1,X2))
     # =======================
     H_Y = compute_entropy_from_targets(y_test, num_classes=10)
@@ -610,7 +647,7 @@ def mnist(args):
         y_test,
         "redundancy",
         distribution_target="categorical",
-        lambda_reg=100,
+        lambda_reg=10,
         num_classes=10,
         lr=1e-4
     )
