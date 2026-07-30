@@ -580,12 +580,6 @@ def mnist(args):
     vis_ece = compute_ece(vis_probs, y_test)
     aud_ece = compute_ece(aud_probs, y_test)
 
-    print(
-        f"\nJoint ECE: {joint_ece:.4f} | "
-        f"Visual ECE: {vis_ece:.4f} | "
-        f"Audio ECE: {aud_ece:.4f}"
-    )
-
     # =======================
     # 4b. MUTUAL INFORMATION I(Y; (X1,X2))
     # =======================
@@ -710,6 +704,13 @@ def mnist(args):
 
     print("PID mean [U0, U1, R, S]:", np.mean(pid, axis=0))
     print("PID + source mean [U0, U1, R, S]:", np.mean(pid_source, axis=0))
+
+
+    print(
+        f"\nJoint ECE: {joint_ece:.4f} | "
+        f"Visual ECE: {vis_ece:.4f} | "
+        f"Audio ECE: {aud_ece:.4f}"
+    )
 
 if __name__ == '__main__':
     args = config().parse_args()
