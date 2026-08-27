@@ -400,8 +400,11 @@ def compute_pid_global(joint_ce, mod0_ce, mod1_ce, red_ce, src_red_ce,
     print(f"H(Y)={hy:.4f}  joint={joint_ce:.4f}  red={red_ce:.4f}  "
           f"src_red={src_red_ce:.4f}  {mod0_name}={mod0_ce:.4f}  {mod1_name}={mod1_ce:.4f}")
 
-    mod0_ce    = min(mod0_ce, hy);    mod1_ce    = min(mod1_ce, hy)
-    red_ce     = min(red_ce,  hy);    src_red_ce = min(src_red_ce, hy)
+    # ===== CLIPPING =====
+    mod0_ce    = min(mod0_ce, hy)
+    mod1_ce    = min(mod1_ce, hy)
+    red_ce     = min(red_ce,  hy)
+    src_red_ce = min(src_red_ce, hy)
     red_ce     = max(red_ce,     joint_ce, mod0_ce, mod1_ce)
     src_red_ce = max(src_red_ce, joint_ce, mod0_ce, mod1_ce)
     red_ce     = min(red_ce, src_red_ce)
@@ -440,9 +443,22 @@ def compute_pointwise_pid_with_source(d, num_classes):
         src_ce   = -logp(F.softmax(r_src, dim=0))[y]
         hy       = -lpy
 
-        joint_ce = min(red_ce, joint_ce);  src_ce  = min(red_ce, src_ce)
-        red_ce   = min(red_ce, hy);        src_ce  = min(src_ce, hy)
-        mod0_ce  = max(mod0_ce, joint_ce); mod1_ce = max(mod1_ce, joint_ce)
+        """
+        joint_ce = min(redundancy_ce, joint_ce)
+        source_redundancy_ce = min(redundancy_ce, source_redundancy_ce)
+
+        redundancy_ce = min(redundancy_ce, h_y)
+        source_redundancy_ce = min(source_redundancy_ce, h_y)
+
+        modality0_ce = max(modality0_ce, joint_ce)
+        modality1_ce = max(modality1_ce, joint_ce)"""
+
+        joint_ce = min(red_ce, joint_ce)
+        src_ce  = min(red_ce, src_ce)
+        red_ce   = min(red_ce, hy)
+        src_ce  = min(src_ce, hy)
+        mod0_ce  = max(mod0_ce, joint_ce)
+        mod1_ce = max(mod1_ce, joint_ce)
 
         total = hy - joint_ce
         r_val = max(hy - red_ce, hy - src_ce)
@@ -455,7 +471,8 @@ def compute_pointwise_pid_with_source(d, num_classes):
 
 
 def normalize_pid(pid):
-    pid_ = np.maximum(pid, 0)
+    #pid_ = np.maximum(pid, 0)
+    pid = pid - np.min(pid, axis=1, keepdims=True)
     pid_ /= pid_.sum(axis=1, keepdims=True) + 1e-12
     return pid_
 
