@@ -443,16 +443,6 @@ def compute_pointwise_pid_with_source(d, num_classes):
         src_ce   = -logp(F.softmax(r_src, dim=0))[y]
         hy       = -lpy
 
-        """
-        joint_ce = min(redundancy_ce, joint_ce)
-        source_redundancy_ce = min(redundancy_ce, source_redundancy_ce)
-
-        redundancy_ce = min(redundancy_ce, h_y)
-        source_redundancy_ce = min(source_redundancy_ce, h_y)
-
-        modality0_ce = max(modality0_ce, joint_ce)
-        modality1_ce = max(modality1_ce, joint_ce)"""
-
         joint_ce = min(red_ce, joint_ce)
         src_ce  = min(red_ce, src_ce)
         red_ce   = min(red_ce, hy)
@@ -471,8 +461,7 @@ def compute_pointwise_pid_with_source(d, num_classes):
 
 
 def normalize_pid(pid):
-    #pid_ = np.maximum(pid, 0)
-    pid = pid - np.min(pid, axis=1, keepdims=True)
+    pid_ = np.maximum(pid, 0)
     pid_ /= pid_.sum(axis=1, keepdims=True) + 1e-12
     return pid_
 
