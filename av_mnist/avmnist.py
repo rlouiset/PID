@@ -84,7 +84,7 @@ def prepare_dataset(args):
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
-    v_train = datasets.MNIST('/home/rlouiset/PID/data/MNIST/', train=True, download=False, transform=transform)
+    v_train = datasets.MNIST('/home/rlouiset/PID/data/MNIST/', train=True, download=True, transform=transform)
     v_test = datasets.MNIST('/home/rlouiset/PID/data/MNIST/', train=False, transform=transform) #'/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/'
     a_train, a_test = load_fsdd()
 
