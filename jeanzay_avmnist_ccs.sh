@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --gpus-per-node=1
-#SBATCH --constraint a100
-#SBATCH --account haj@a100
+#SBATCH --constraint h100
+#SBATCH --account haj@h100
 #SBATCH --output avmnist_sum_ccs_lambda0.txt
 
 module purge # purge modules inherited by default
