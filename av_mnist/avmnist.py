@@ -64,8 +64,8 @@ def load_fsdd():
     ])
 
     # Initialize a generator for a local version of FSDD
-    fsdd = TorchFSDDGenerator(version='local', path='/lustre/fswork/projects/rech/haj/uik24xv/datasets/torch-fsdd/lib/test/data/v1.0.10', transforms=transforms,
-                              load_all=True) #  '/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10'
+    fsdd = TorchFSDDGenerator(version='local', path='/home/rlouiset/PID/torch-fsdd/lib/test/data/v1.0.10', transforms=transforms,
+                              load_all=True) #  '/lustre/fswork/projects/rech/haj/uik24xv/datasets/torch-fsdd/lib/test/data/v1.0.10'
 
     # Create two Torch datasets for a train-test split from the generator
     train_set, test_set = fsdd.train_test_split(test_size=0.2)
@@ -84,8 +84,8 @@ def prepare_dataset(args):
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
-    v_train = datasets.MNIST('/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/', train=True, download=False, transform=transform)
-    v_test = datasets.MNIST('/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/', train=False, transform=transform)
+    v_train = datasets.MNIST('/home/rlouiset/PID/data/MNIST/', train=True, download=False, transform=transform)
+    v_test = datasets.MNIST('/home/rlouiset/PID/data/MNIST/', train=False, transform=transform) #'/lustre/fswork/projects/rech/haj/uik24xv/datasets/MNIST/'
     a_train, a_test = load_fsdd()
 
     # Create a multimodal dataset instance and its DataLoader
