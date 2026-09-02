@@ -16,4 +16,4 @@ module load miniforge/24.9.0
 conda activate py39
 export WANDB_MODE=offline
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID"
-srun python3 trifeatures/trifeatures_comm_batch.py --task unique2 --num-classes 10
+srun python3 trifeatures/trifeatures_comm_batch.py --task unique2 --num-classes 10 --seed 1
