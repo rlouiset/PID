@@ -118,6 +118,8 @@ Run our CCS + supervised GK estimator on a synthetic dataset:
 python synthetic/experiments/ccs_source_aware_base.py \
     --data-path synthetic/experiments/DATA_redundancy.pickle \
     --keys 0 1 label --bs 256 --input-dim 200 --hidden-dim 512 --num-classes 4
+    
+    export PYTHONPATH="${PYTHONPATH}:${PWD}"
 ```
 
 Run the LSMI baseline:
