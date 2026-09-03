@@ -80,12 +80,14 @@ def compute_pid(y, y_pred_old, y_pred_new, y_pred_joint):
     i_new = pointwise_info(y, y_pred_new, var_y, y_bar, mse_new)
     i_joint = pointwise_info(y, y_pred_joint, var_y, y_bar, mse_joint)
 
-    both_pos = (i_old > 0) & (i_new > 0)
-    r = np.where(both_pos, np.minimum(i_old, i_new), 0.0)
+    # both_pos = (i_old > 0) & (i_new > 0)
+    # r = np.where(both_pos, np.minimum(i_old, i_new), 0.0)
+    r = np.minimum(i_old, i_new)
 
     I_old = float(np.mean(i_old))
     I_new = float(np.mean(i_new))
     I_joint = float(np.mean(i_joint))
+    # R = min(I_old, I_new)
     R = float(np.mean(r))
 
     I_old = min(I_old, I_joint)
@@ -196,7 +198,7 @@ def load_data_slope(tadpole_path, adnimerge_path, min_months=12):
         "Fusiform_bl", "MidTemp_bl",
     ]
     numeric_cols = (
-        ["ABETA_bl", "TAU_bl", "PTAU_bl", "ICV", "FDG"]
+        ["ABETA_bl", "TAU_bl", "PTAU_bl", "ICV"]
         + volumes
         + ["ADAS13", "MMSE", "CDRSB", "FAQ",
            "RAVLT_immediate", "RAVLT_learning", "RAVLT_forgetting",
@@ -233,7 +235,6 @@ def define_modalities():
         ("CSF_Amyloid", ["ABETA_bl"]),
         ("CSF_Tau", ["TAU_bl", "PTAU_bl"]),
         ("Volumetric_MRI", vols),
-        ("FDG_PET", ["FDG"]),
     ])
 
 
@@ -412,8 +413,10 @@ def train_gk(Xa_tr, Xb_tr, y_tr, Xa_va, Xb_va, y_va,
     mse_b = mean_squared_error(y_te, pred_b)
     i_a = pointwise_info(y_te, pred_a, var_y, y_bar, mse_a)
     i_b = pointwise_info(y_te, pred_b, var_y, y_bar, mse_b)
-    both_pos = (i_a > 0) & (i_b > 0)
-    r_source = np.where(both_pos, np.minimum(i_a, i_b), 0.0)
+    # both_pos = (i_a > 0) & (i_b > 0)
+    # r_source = np.where(both_pos, np.minimum(i_a, i_b), 0.0)
+
+    r_source = np.minimum(i_a, i_b)
     return float(np.mean(r_source))
 
 
@@ -572,8 +575,7 @@ def plot_cascade(results, save_path="cascading_pid_slope.pdf"):
         "Cognitive_Baseline": "CogBL",
         "CSF_Amyloid": "Aβ",
         "CSF_Tau": "Tau",
-        "Volumetric_MRI": "MRI",
-        "FDG_PET": "FDG",
+        "Volumetric_MRI": "MRI"
     }
     def sn(mod): return SHORT.get(mod, mod)
     def sl(mods): return "+".join(sn(m) for m in mods)
@@ -614,10 +616,10 @@ def plot_cascade(results, save_path="cascading_pid_slope.pdf"):
 
         ax.pie(vals, labels=labs, colors=cols, startangle=90,
                labeldistance=1.2,
-               textprops={"fontsize": 10},
+               textprops={"fontsize": 17},
                wedgeprops={"edgecolor": "white", "linewidth": 1.5})
         title = f"Step {i}: +{added}" if i > 0 else f"Step 0: {added}"
-        ax.set_title(f"{title}\nR²={r['R2_joint']:.3f}", fontsize=13, fontweight="bold", pad=14)
+        ax.set_title(f"{title}\nR²={r['R2_joint']:.3f}", fontsize=17, fontweight="bold", pad=14)
 
     patches = [
         mpatches.Patch(color=C["R_source"], label="Redundancy (source)"),
@@ -627,10 +629,10 @@ def plot_cascade(results, save_path="cascading_pid_slope.pdf"):
         mpatches.Patch(color=C["S"], label="Synergy"),
         mpatches.Patch(color=C["unexplained"], label="Unexplained"),
     ]
-    fig.legend(handles=patches, loc="lower center", ncol=3, fontsize=11,
+    fig.legend(handles=patches, loc="lower center", ncol=3, fontsize=17,
                frameon=False, bbox_to_anchor=(0.5, -0.01))
     fig.suptitle("Cascading PID — Predicting ADAS13 Slope (pts/yr) from Baseline",
-                 fontsize=13, fontweight="bold", y=1.02)
+                 fontsize=17, fontweight="bold", y=1.02)
     plt.tight_layout(rect=[0, 0.08, 1, 1])
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     print(f"\nSaved: {save_path}")
