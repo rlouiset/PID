@@ -61,6 +61,10 @@ parser.add_argument("--num-workers", default=4,   type=int)
 parser.add_argument("--epochs",      default=20,  type=int)
 parser.add_argument("--lr",          default=1e-4, type=float)
 parser.add_argument("--weight-decay",default=1e-2, type=float)
+parser.add_argument("--encoder-lr",   default=2e-5, type=float,
+                    help="LR for pretrained image/text encoders (--lr is for new layers)")
+parser.add_argument("--warmup-epochs", default=1.0, type=float,
+                    help="Linear LR warmup length, in epochs")
 parser.add_argument("--saved-model", default="/home/rlouiset/food101_model.pth", type=str)
 parser.add_argument("--load-model", default=None, type=str,
                     help="Path to a saved model; if the file exists training is skipped")
@@ -334,10 +338,36 @@ class Food101CoMMModel(nn.Module):
 # TRAINING / TESTING
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def train_comm(model, traindata, validdata, epochs, lr, weight_decay, save=None):
-    criterion  = nn.CrossEntropyLoss()
-    optimizer  = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    scheduler  = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+def train_comm(model, traindata, validdata, epochs, lr, weight_decay, save=None,
+               encoder_lr=2e-5, warmup_epochs=1.0):
+    """
+    Two learning rates: pretrained encoders get `encoder_lr` (full fine-tuning
+    of RoBERTa at 1e-4 can collapse the text branch to a uniform prediction),
+    new layers (adapters, fusion, heads) get `lr`. Linear warmup over
+    `warmup_epochs`, then cosine decay, stepped per batch.
+    """
+    criterion = nn.CrossEntropyLoss()
+    enc_params = [p for m in (model.img_encoder, model.txt_encoder)
+                  for p in m.parameters() if p.requires_grad]
+    enc_ids    = {id(p) for p in enc_params}
+    new_params = [p for p in model.parameters()
+                  if p.requires_grad and id(p) not in enc_ids]
+    groups = [{"params": new_params, "lr": lr}]
+    if enc_params:
+        groups.append({"params": enc_params, "lr": encoder_lr})
+    optimizer = torch.optim.AdamW(groups, weight_decay=weight_decay)
+
+    total_steps  = max(1, epochs * len(traindata))
+    warmup_steps = int(warmup_epochs * len(traindata))
+
+    def lr_lambda(step):
+        if step < warmup_steps:
+            return (step + 1) / warmup_steps
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        return 0.5 * (1.0 + math.cos(math.pi * min(progress, 1.0)))
+
+    scheduler  = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    chance_ce  = math.log(NUM_CLASSES)
     best_model = copy.deepcopy(model)
     best_val   = float("inf")
 
@@ -353,21 +383,32 @@ def train_comm(model, traindata, validdata, epochs, lr, weight_decay, save=None)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 8.0)
             optimizer.step()
+            scheduler.step()
             total_loss += loss.item() * len(y); n += len(y)
-        scheduler.step()
 
         model.eval()
         val_loss = 0.0; vn = 0; vc = 0
+        mod_ce = [0.0, 0.0]; mod_c = [0, 0]
         with torch.no_grad():
             for imgs, inp, msk, y in validdata:
                 imgs, inp, msk, y = (imgs.to(device), inp.to(device),
                                      msk.to(device), y.to(device).long())
-                joint, _, _ = model(imgs, inp, msk)
+                joint, _, mod_logits = model(imgs, inp, msk)
                 val_loss += criterion(joint, y).item() * len(y)
                 vn += len(y)
                 vc += (joint.argmax(1) == y).sum().item()
+                for k in range(2):
+                    mod_ce[k] += criterion(mod_logits[k], y).item() * len(y)
+                    mod_c[k]  += (mod_logits[k].argmax(1) == y).sum().item()
         val_loss /= vn
-        print(f"Epoch {epoch:02d}  train={total_loss/n:.4f}  val={val_loss:.4f}  acc={vc/vn:.4f}")
+        mod_ce = [c / vn for c in mod_ce]
+        print(f"Epoch {epoch:02d}  train={total_loss/n:.4f}  val={val_loss:.4f}  "
+              f"acc={vc/vn:.4f}  "
+              f"{args.mod0}_acc={mod_c[0]/vn:.4f}  {args.mod1}_acc={mod_c[1]/vn:.4f}")
+        for k, name in enumerate([args.mod0, args.mod1]):
+            if abs(mod_ce[k] - chance_ce) < 0.05:
+                print(f"  WARNING: {name} head at chance (val CE={mod_ce[k]:.4f} "
+                      f"~ ln({NUM_CLASSES})={chance_ce:.4f}) -- branch has collapsed")
         if val_loss < best_val:
             best_val   = val_loss
             best_model = copy.deepcopy(model)
@@ -609,7 +650,9 @@ if __name__ == "__main__":
         model = train_comm(model, traindata, valdata,
                            epochs=args.epochs, lr=args.lr,
                            weight_decay=args.weight_decay,
-                           save=args.saved_model)
+                           save=args.saved_model,
+                           encoder_lr=args.encoder_lr,
+                           warmup_epochs=args.warmup_epochs)
 
     # ========= 3. TEST CoMM =========
     print("\nTest performance:")
