@@ -20,13 +20,19 @@ export HF_HOME=$WORK/hf_cache
 export TORCH_HOME=$WORK/torch_cache
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID"
 
+# Code lives in $HOME (small quota): write all outputs (lightning_logs,
+# checkpoints, saved_models) to $SCRATCH instead.
+PID_DIR=/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID
+RUN_DIR=$SCRATCH/pid_runs
+mkdir -p "$RUN_DIR" && cd "$RUN_DIR"
+
 DATASETS=$SCRATCH/datasets   # Food101 is too big for $WORK quota
 SEED=${SEED:-0}
 # Per-seed model: trains if missing. Set MODEL=$DATASETS/food101_model.pth to reuse the old one.
 MODEL=${MODEL:-saved_models/food101_comm_image-text_seed${SEED}.pt}
 mkdir -p saved_models
 
-srun python3 food101/food101_comm_ccs_pid.py \
+srun python3 "$PID_DIR"/food101/food101_comm_ccs_pid.py \
     --data-root "$DATASETS/Food101" \
     --seed "$SEED" \
     --saved-model "$MODEL" \

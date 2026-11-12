@@ -17,12 +17,18 @@ conda activate py39
 export WANDB_MODE=offline
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID"
 
+# Code lives in $HOME (small quota): write all outputs (lightning_logs,
+# checkpoints, saved_models) to $SCRATCH instead.
+PID_DIR=/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID
+RUN_DIR=$SCRATCH/pid_runs
+mkdir -p "$RUN_DIR" && cd "$RUN_DIR"
+
 DATA=/lustre/fswork/projects/rech/haj/uik24xv/datasets/sarcasm.pkl   # TODO: check path
 SEED=${SEED:-0}
 MODEL=${MODEL:-saved_models/sarcasm_comm_vision-text_seed${SEED}.pt}
 mkdir -p saved_models
 
-srun python3 affect/sarcasm_comm_ccs_source_redundancy.py \
+srun python3 "$PID_DIR"/affect/sarcasm_comm_ccs_source_redundancy.py \
     --data-path "$DATA" \
     --mod0 vision --mod1 text \
     --seed "$SEED" \
