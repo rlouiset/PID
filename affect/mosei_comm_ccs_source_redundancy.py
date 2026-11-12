@@ -52,7 +52,16 @@ parser.add_argument("--mod1", default="text",   choices=["vision", "audio", "tex
 parser.add_argument("--saved-model", default=None, type=str)
 parser.add_argument("--load-model", default=None, type=str,
                     help="Path to a saved model; if the file exists training is skipped")
+parser.add_argument("--seed", default=0, type=int)
 args = parser.parse_args()
+
+# ─── Seeding ─────────────────────────────────────────────────────────────────
+import random
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+torch.cuda.manual_seed_all(args.seed)
+print(f"Seed: {args.seed}")
 
 assert args.mod0 != args.mod1, "--mod0 and --mod1 must be different"
 

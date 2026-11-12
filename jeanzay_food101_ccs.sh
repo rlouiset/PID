@@ -21,8 +21,14 @@ export TORCH_HOME=$WORK/torch_cache
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID"
 
 DATASETS=$SCRATCH/datasets   # Food101 is too big for $WORK quota
+SEED=${SEED:-0}
+# Per-seed model: trains if missing. Set MODEL=$DATASETS/food101_model.pth to reuse the old one.
+MODEL=${MODEL:-saved_models/food101_comm_image-text_seed${SEED}.pt}
+mkdir -p saved_models
 
 srun python3 food101/food101_comm_ccs_pid.py \
     --data-root "$DATASETS/Food101" \
-    --load-model "$DATASETS/food101_model.pth" \
+    --seed "$SEED" \
+    --saved-model "$MODEL" \
+    --load-model "$MODEL" \
     --mod0 image --mod1 text

@@ -18,10 +18,13 @@ export WANDB_MODE=offline
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}/lustre/fshomisc/home/rech/genpuc01/uik24xv/PID"
 
 DATA=/lustre/fswork/projects/rech/haj/uik24xv/datasets/sarcasm.pkl   # TODO: check path
+SEED=${SEED:-0}
+MODEL=${MODEL:-saved_models/sarcasm_comm_vision-text_seed${SEED}.pt}
 mkdir -p saved_models
 
 srun python3 affect/sarcasm_comm_ccs_source_redundancy.py \
     --data-path "$DATA" \
     --mod0 vision --mod1 text \
-    --saved-model saved_models/sarcasm_comm_vision-text.pt \
-    --load-model saved_models/sarcasm_comm_vision-text.pt
+    --seed "$SEED" \
+    --saved-model "$MODEL" \
+    --load-model "$MODEL"

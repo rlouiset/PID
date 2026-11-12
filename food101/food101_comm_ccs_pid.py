@@ -80,7 +80,16 @@ parser.add_argument("--load-model",   default="/home/rlouiset/food101_model.pth"
 parser.add_argument("--mod0",         default="image", type=str)
 parser.add_argument("--mod1",         default="text",  type=str)
 parser.add_argument("--num-classes",  default=101, type=int)
+parser.add_argument("--seed", default=0, type=int)
 args = parser.parse_args()
+
+# ─── Seeding ─────────────────────────────────────────────────────────────────
+import random
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+torch.cuda.manual_seed_all(args.seed)
+print(f"Seed: {args.seed}")
 
 NUM_CLASSES = args.num_classes
 
