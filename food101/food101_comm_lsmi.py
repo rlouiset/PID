@@ -62,6 +62,8 @@ parser.add_argument("--epochs",      default=20,  type=int)
 parser.add_argument("--lr",          default=1e-4, type=float)
 parser.add_argument("--weight-decay",default=1e-2, type=float)
 parser.add_argument("--saved-model", default="/home/rlouiset/food101_model.pth", type=str)
+parser.add_argument("--load-model", default=None, type=str,
+                    help="Path to a saved model; if the file exists training is skipped")
 # LSMI
 parser.add_argument("--lsmi-embed-size",     default=128, type=int,
                     help="Hidden dim for LSMI discriminators")
@@ -588,11 +590,26 @@ if __name__ == "__main__":
     train = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"  Parameters: {total:,}  (trainable: {train:,})")
 
-    print("\nTraining…")
-    model = train_comm(model, traindata, valdata,
-                       epochs=args.epochs, lr=args.lr,
-                       weight_decay=args.weight_decay,
-                       save=args.saved_model)
+    if args.load_model and os.path.isfile(args.load_model):
+        # Copy only the weights: a pickled full model saved with other library
+        # versions (e.g. transformers) may not run with the installed ones.
+        print(f"\nLoading model weights from {args.load_model}...")
+        loaded = torch.load(args.load_model, map_location="cpu", weights_only=False)
+        state_dict = loaded.state_dict() if isinstance(loaded, nn.Module) else loaded
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+        missing    = [k for k in missing    if not k.endswith("position_ids")]
+        unexpected = [k for k in unexpected if not k.endswith("position_ids")]
+        if missing or unexpected:
+            raise RuntimeError(f"State dict mismatch.\n  missing: {missing}\n  unexpected: {unexpected}")
+        del loaded, state_dict
+        model = model.to(device)
+        print("  Model weights loaded -- skipping training.")
+    else:
+        print("\nTraining…")
+        model = train_comm(model, traindata, valdata,
+                           epochs=args.epochs, lr=args.lr,
+                           weight_decay=args.weight_decay,
+                           save=args.saved_model)
 
     # ========= 3. TEST CoMM =========
     print("\nTest performance:")
