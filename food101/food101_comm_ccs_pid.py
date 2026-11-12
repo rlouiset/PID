@@ -584,15 +584,12 @@ def compute_pointwise_pid_with_source(d, num_classes):
         src_ce   = -logp(F.softmax(r_src, dim=0))[y]
         hy       = -lpy
 
-        joint_ce = min(red_ce, joint_ce)
-        src_ce   = min(red_ce, src_ce)
-        red_ce   = min(red_ce, hy)
-        src_ce   = min(src_ce, hy)
-        mod0_ce  = max(mod0_ce, joint_ce)
-        mod1_ce  = max(mod1_ce, joint_ce)
+        joint_ce = min(red_ce, joint_ce);
+        mod0_ce  = max(mod0_ce, joint_ce);
+        mod1_ce = max(mod1_ce, joint_ce)
 
         total = hy - joint_ce
-        r_val = max(hy - red_ce, hy - src_ce)
+        r_val = hy - red_ce
         u0    = hy - mod0_ce - r_val
         u1    = hy - mod1_ce - r_val
         s     = total - u0 - u1 - r_val

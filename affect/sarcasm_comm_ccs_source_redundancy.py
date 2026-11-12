@@ -4,6 +4,7 @@ CoMM/FactorCL architecture for MUsTARD sarcasm PID estimation.
   - Fusion               : CLS token + concat sequences → 1-layer Transformer (8 heads) → CLS
 Reference: Dufumier et al. 2025 (https://arxiv.org/pdf/2409.07402)
 """
+import os
 import math
 import copy
 import torch
@@ -43,6 +44,8 @@ parser.add_argument("--temporal-dropout-max", default=0.4, type=float)
 parser.add_argument("--mod0", default="vision", choices=["vision", "audio", "text"])
 parser.add_argument("--mod1", default="text",   choices=["vision", "audio", "text"])
 parser.add_argument("--saved-model", default=None, type=str)
+parser.add_argument("--load-model", default=None, type=str,
+                    help="Path to a saved model; if the file exists training is skipped")
 args = parser.parse_args()
 
 assert args.mod0 != args.mod1, "--mod0 and --mod1 must be different"
@@ -412,12 +415,12 @@ def compute_pointwise_pid_with_source(d, num_classes):
         src_ce   = -logp(F.softmax(r_src, dim=0))[y]
         hy       = -lpy
 
-        joint_ce = min(red_ce, joint_ce);  src_ce  = min(red_ce, src_ce)
-        red_ce   = min(red_ce, hy);        src_ce  = min(src_ce, hy)
-        mod0_ce  = max(mod0_ce, joint_ce); mod1_ce = max(mod1_ce, joint_ce)
+        joint_ce = min(red_ce, joint_ce);
+        mod0_ce  = max(mod0_ce, joint_ce);
+        mod1_ce = max(mod1_ce, joint_ce)
 
         total = hy - joint_ce
-        r_val = max(hy - red_ce, hy - src_ce)
+        r_val = hy - red_ce
         u0    = hy - mod0_ce - r_val
         u1    = hy - mod1_ce - r_val
         s     = total - u0 - u1 - r_val
@@ -487,12 +490,17 @@ if __name__ == "__main__":
     ).to(device)
     print(f"Model parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
-    # ========= 3. TRAIN =========
-    model = train_comm(
-        model, traindata, validdata,
-        epochs=args.epochs, lr=args.lr, weight_decay=args.weight_decay,
-        save=args.saved_model,
-    )
+    # ========= 3. TRAIN or LOAD =========
+    if args.load_model and os.path.isfile(args.load_model):
+        print(f"\nLoading model from {args.load_model}...")
+        model = torch.load(args.load_model, map_location=device, weights_only=False).to(device)
+        print("  Model loaded -- skipping training.")
+    else:
+        model = train_comm(
+            model, traindata, validdata,
+            epochs=args.epochs, lr=args.lr, weight_decay=args.weight_decay,
+            save=args.saved_model,
+        )
 
     # ========= 4. TEST =========
     d = test_comm(model, testdata)
