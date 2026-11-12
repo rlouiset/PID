@@ -663,9 +663,21 @@ if __name__ == "__main__":
     # ========= 4. TRAIN or LOAD =========
     if args.load_model and os.path.isfile(args.load_model):
         print(f"\nLoading model from {args.load_model}…")
-        model = torch.load(args.load_model, map_location=device, weights_only=False)
+        # The .pth is a pickled full model saved with another `transformers`
+        # version: its unpickled HF config objects can miss attributes the
+        # installed version expects. Only copy its weights into the freshly
+        # built model (which uses the installed version's classes/config).
+        loaded = torch.load(args.load_model, map_location="cpu", weights_only=False)
+        state_dict = loaded.state_dict() if isinstance(loaded, nn.Module) else loaded
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+        # Non-persistent buffers (e.g. position_ids) may differ across versions.
+        missing    = [k for k in missing    if not k.endswith("position_ids")]
+        unexpected = [k for k in unexpected if not k.endswith("position_ids")]
+        if missing or unexpected:
+            raise RuntimeError(f"State dict mismatch.\n  missing: {missing}\n  unexpected: {unexpected}")
+        del loaded, state_dict
         model = model.to(device)
-        print("  Model loaded — skipping training.")
+        print("  Model weights loaded — skipping training.")
     else:
         print("\nTraining…")
         model = train_comm(model, traindata, valdata,
